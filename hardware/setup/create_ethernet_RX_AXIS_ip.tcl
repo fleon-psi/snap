@@ -40,6 +40,12 @@ make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_ref_clk]
 #make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_serial_port]
 make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/util_ds_buf_0/CLK_IN_D]
 
+create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 axis_rx_o
+connect_bd_intf_net [get_bd_intf_ports axis_rx_o] [get_bd_intf_pins cmac_usplus_0/axis_rx]
+#make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_rx]
+create_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 gt_rx 
+connect_bd_intf_net [get_bd_intf_ports gt_rx] [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_rx]
+
 ##connect_bd_intf_net [get_bd_intf_pins eth_100g/lbus_axis_converter_0/lbus_tx] [get_bd_intf_pins eth_100g/cmac_usplus_0/lbus_tx]
 ##connect_bd_intf_net [get_bd_intf_pins eth_100g/lbus_axis_converter_0/lbus_rx] [get_bd_intf_pins eth_100g/cmac_usplus_0/lbus_rx]
 connect_bd_net [get_bd_pins eth_100g/cmac_usplus_0/gt_txusrclk2] [get_bd_pins eth_100g/cmac_usplus_0/rx_clk]
@@ -84,10 +90,6 @@ connect_bd_net [get_bd_pins eth_100g/zeroX56/dout] [get_bd_pins eth_100g/cmac_us
 ##create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 payload_to_user
 ##set_property -dict [list CONFIG.CLK_DOMAIN {ethernet_ip_cmac_usplus_0_0_gt_txusrclk2} CONFIG.FREQ_HZ {322265625}] [get_bd_intf_ports payload_to_user]
 ##connect_bd_intf_net [get_bd_intf_pins GULF_Stream_0/payload_to_user] [get_bd_intf_ports payload_to_user]
-
-#make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_rx]
-##create_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 gt_rx 
-##connect_bd_intf_net [get_bd_intf_ports gt_rx] [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_rx]
 
 #make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_tx]
 ##create_bd_intf_port -mode Master -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 gt_tx 
