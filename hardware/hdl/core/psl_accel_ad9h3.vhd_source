@@ -227,7 +227,44 @@ ENTITY psl_accel IS
     pcie_rc1_txn                        : OUT   STD_LOGIC_VECTOR(3 downto 0);
     pcie_rc1_txp                        : OUT   STD_LOGIC_VECTOR(3 downto 0);
 #endif
-
+#ifdef CONFIG_ENABLE_ETHERNET
+    init_clk_n                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    init_clk_p                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    gt_ref_clk_n                        : IN STD_LOGIC; 
+    gt_ref_clk_p                        : IN STD_LOGIC;
+    gt_rx_gt_port_0_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_0_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_1_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_1_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_2_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_2_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_3_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_3_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_4_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_4_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_5_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_5_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_6_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_6_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_7_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_7_p                   : IN STD_LOGIC;
+    gt_tx_gt_port_0_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_0_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_1_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_1_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_2_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_2_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_3_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_3_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_4_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_4_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_5_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_5_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_6_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_6_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_7_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_7_p                   : OUT STD_LOGIC;
+#endif
     -- Parity Enable output and 250MHz Clock input
     ah_tbreq                            : OUT std_logic ;                       -- Timebase command request
     ah_paren                            : OUT   STD_LOGIC;
