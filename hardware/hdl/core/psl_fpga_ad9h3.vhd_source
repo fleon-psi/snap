@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------
 ----------------------------------------------------------------------------
 --
--- Copyright 2017 International Business Machines
+-- Copyright 2019 International Business Machines
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -34,11 +34,10 @@ ENTITY psl_fpga IS
     c0_ddr4_ba                : OUT   STD_LOGIC_VECTOR(1 DOWNTO 0);
     c0_ddr4_cke               : OUT   STD_LOGIC_VECTOR(0 DOWNTO 0);
     c0_ddr4_cs_n              : OUT   STD_LOGIC_VECTOR(0 DOWNTO 0);
-    c0_ddr4_parity            : OUT   STD_LOGIC;
-    --c0_ddr4_dm_dbi_n          : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
+    c0_ddr4_dm_dbi_n          : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
     c0_ddr4_dq                : INOUT STD_LOGIC_VECTOR(71 DOWNTO 0);
-    c0_ddr4_dqs_c             : INOUT STD_LOGIC_VECTOR(17 DOWNTO 0);
-    c0_ddr4_dqs_t             : INOUT STD_LOGIC_VECTOR(17 DOWNTO 0);
+    c0_ddr4_dqs_c             : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
+    c0_ddr4_dqs_t             : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
     c0_ddr4_odt               : OUT   STD_LOGIC_VECTOR(0 DOWNTO 0);
     c0_ddr4_bg                : OUT   STD_LOGIC_VECTOR(1 DOWNTO 0);
     c0_ddr4_reset_n           : OUT   STD_LOGIC;
@@ -49,22 +48,23 @@ ENTITY psl_fpga IS
 
     -- CAPI PSL Interface
     --
-    pcie_rst_n        	  : in    std_logic;     -- Active low reset from the PCIe reset pin of the device
-    pcie_clkp	          : in    std_logic;     -- 100MHz Refclk
-    pcie_clkn             : in    std_logic;     -- 100MHz Refclk
+    pci_pi_nperst0        : in    std_logic;     -- Active low reset from the PCIe reset pin of the device
+    pci_pi_refclk_p0      : in    std_logic;     -- 100MHz Refclk
+    pci_pi_refclk_n0      : in    std_logic;     -- 100MHz Refclk
 
 -- Xilinx requires both pins of differential transceivers
-    pcie_rxp              : in  std_logic_vector(15 downto 0);
-    pcie_rxn              : in  std_logic_vector(15 downto 0);
-    pcie_txp              : out std_logic_vector(15 downto 0);
-    pcie_txn              : out std_logic_vector(15 downto 0)
+    pcie_rxp              : in  std_logic_vector(15 downto 0)   ;
+    pcie_rxn              : in  std_logic_vector(15 downto 0)   ;
+    pcie_txp              : out std_logic_vector(15 downto 0)   ;
+    pcie_txn              : out std_logic_vector(15 downto 0)   ;
 
---  fan_cde               : out   std_logic;
+    --pci0_i_rxp_in0        : in    std_logic;
+    --pci0_o_txp_out0       : out   std_logic;
 
 -- Flash Interface
---    spi_miso_secondary    : in    std_logic;
---    spi_mosi_secondary    : out   std_logic;
---    spi_cen_secondary     : out   std_logic
+    spi_miso_secondary    : in    std_logic;
+    spi_mosi_secondary    : out   std_logic;
+    spi_cen_secondary     : out   std_logic
 
 -- PTMON PMBUS
 --    b_basei2c_scl         : inout std_logic;  -- clock
@@ -201,11 +201,10 @@ Component psl_accel
     c0_ddr4_ba                          : OUT   STD_LOGIC_VECTOR(1 DOWNTO 0);
     c0_ddr4_cke                         : OUT   STD_LOGIC_VECTOR(0 DOWNTO 0);
     c0_ddr4_cs_n                        : OUT   STD_LOGIC_VECTOR(0 DOWNTO 0);
-    c0_ddr4_parity 			: OUT   STD_LOGIC;
-    --c0_ddr4_dm_dbi_n                    : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
+    c0_ddr4_dm_dbi_n                    : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
     c0_ddr4_dq                          : INOUT STD_LOGIC_VECTOR(71 DOWNTO 0);
-    c0_ddr4_dqs_c                       : INOUT STD_LOGIC_VECTOR(17 DOWNTO 0);
-    c0_ddr4_dqs_t                       : INOUT STD_LOGIC_VECTOR(17 DOWNTO 0);
+    c0_ddr4_dqs_c                       : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
+    c0_ddr4_dqs_t                       : INOUT STD_LOGIC_VECTOR(8 DOWNTO 0);
     c0_ddr4_odt                         : OUT   STD_LOGIC_VECTOR(0 DOWNTO 0);
     c0_ddr4_bg                          : OUT   STD_LOGIC_VECTOR(1 DOWNTO 0);
     c0_ddr4_reset_n                     : OUT   STD_LOGIC;
@@ -228,22 +227,23 @@ End Component psl_accel;
 Component capi_bsp_wrap
   PORT(
 -- pci interface
-    pcie_rst_n        : in    std_logic;     -- Active low reset from the PCIe reset pin of the device
-    pcie_clkp      : in    std_logic;     -- 100MHz Refclk
-    pcie_clkn      : in    std_logic;     -- 100MHz Refclk
+    pci_pi_nperst0        : in    std_logic;     -- Active low reset from the PCIe reset pin of the device
+    pci_pi_refclk_p0      : in    std_logic;     -- 100MHz Refclk
+    pci_pi_refclk_n0      : in    std_logic;     -- 100MHz Refclk
 
 -- Xilinx requires both pins of differential transceivers
     pcie_rxp              : in  std_logic_vector(15 downto 0)   ;
     pcie_rxn              : in  std_logic_vector(15 downto 0)   ;
     pcie_txp              : out std_logic_vector(15 downto 0)   ;
     pcie_txn              : out std_logic_vector(15 downto 0)   ;
+    --pci0_i_rxp_in0        : in    std_logic;
+    --pci0_o_txp_out0       : out   std_logic;
 
---    fan_cde               : out std_logic                       ;
 
 -- Flash Interface
---    spi_miso_secondary    : in    std_logic;
---    spi_mosi_secondary    : out   std_logic;
---    spi_cen_secondary     : out   std_logic;
+    spi_miso_secondary    : in    std_logic;
+    spi_mosi_secondary    : out   std_logic;
+    spi_cen_secondary     : out   std_logic;
 
 -- PTMON PMBUS
 --    b_basei2c_scl         : inout std_logic;  -- clock
@@ -447,7 +447,7 @@ SIGNAL hd0_cpl_byte_count  : std_logic_vector(0 to 9)   ;
 SIGNAL hd0_cpl_size        : std_logic_vector(0 to 9)   ;
 SIGNAL hd0_cpl_data        : std_logic_vector(0 to 1023);
 
-SIGNAL user_image_q        : std_logic := '1';  --set to 1 to indicate images meant for user location. set to 0 to indicate factory image. 
+SIGNAL user_image_q        : std_logic := '1';  --set to 1 to indicate images meant for user location. set to 0 to indicate factory image.
 ATTRIBUTE dont_touch       : string;
 ATTRIBUTE dont_touch of user_image_q: SIGNAL IS "true";
 SIGNAL gold_factory        : std_logic;
@@ -466,8 +466,7 @@ BEGIN
       c0_ddr4_ba                        => c0_ddr4_ba,
       c0_ddr4_cke                       => c0_ddr4_cke,
       c0_ddr4_cs_n                      => c0_ddr4_cs_n,
-      c0_ddr4_parity  		 	=> c0_ddr4_parity,
-      --c0_ddr4_dm_dbi_n                  => c0_ddr4_dm_dbi_n,
+      c0_ddr4_dm_dbi_n                  => c0_ddr4_dm_dbi_n,
       c0_ddr4_dq                        => c0_ddr4_dq,
       c0_ddr4_dqs_c                     => c0_ddr4_dqs_c,
       c0_ddr4_dqs_t                     => c0_ddr4_dqs_t,
@@ -615,9 +614,9 @@ BEGIN
   c0: capi_bsp_wrap
     PORT MAP (
 -- pci interface
-      pcie_rst_n          => pcie_rst_n,       -- Active low reset from the PCIe reset pin of the device
-      pcie_clkp           => pcie_clkp,     -- 100MHz Refclk
-      pcie_clkn           => pcie_clkn,     -- 100MHz Refclk
+      pci_pi_nperst0      => pci_pi_nperst0,       -- Active low reset from the PCIe reset pin of the device
+      pci_pi_refclk_p0    => pci_pi_refclk_p0,     -- 100MHz Refclk
+      pci_pi_refclk_n0    => pci_pi_refclk_n0,     -- 100MHz Refclk
 
 -- Xilinx requires both pins of differential transceivers
       pcie_rxp            => pcie_rxp , -- Input
@@ -625,12 +624,10 @@ BEGIN
       pcie_txp            => pcie_txp , -- Output
       pcie_txn            => pcie_txn , -- Output
 
---      fan_cde             => open,        
-
 -- SPI Flash Interface
---      spi_miso_secondary  => spi_miso_secondary,
---      spi_mosi_secondary  => spi_mosi_secondary,
---      spi_cen_secondary   => spi_cen_secondary,
+      spi_miso_secondary  => spi_miso_secondary,
+      spi_mosi_secondary  => spi_mosi_secondary,
+      spi_cen_secondary   => spi_cen_secondary,
 
 -- PTMON PMBUS
 --      b_basei2c_scl       => b_basei2c_scl,
