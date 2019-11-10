@@ -2,6 +2,7 @@
 ############################################################################
 ##
 ## Copyright 2016-2019 International Business Machines
+## Copyright 2019 Filip Leonarski, Paul Scherrer Institute
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License");
 ## you may not use this file except in compliance with the License.
@@ -335,6 +336,11 @@ if { $fpga_card == "ADKU3" } {
   } elseif { $eth_used == "TRUE" } {
     add_files -fileset constrs_1 -norecurse $root_dir/setup/AD9V3/snap_eth0_pins.xdc
     set_property used_in_synthesis false [get_files $root_dir/setup/AD9V3/snap_eth0_pins.xdc]
+  }
+} elseif { ($fpga_card == "AD9H3") } {
+  if { $eth_used == "TRUE" } {
+    add_files -fileset constrs_1 -norecurse $root_dir/setup/AD9H3/snap_eth_pins.xdc
+    set_property used_in_synthesis false [get_files $root_dir/setup/AD9H3/snap_eth_pins.xdc]
   }
 } elseif { ($fpga_card == "RCXVUP") } {
   if { $sdram_used == "TRUE" } {
