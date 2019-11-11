@@ -1,7 +1,7 @@
 set root_dir        $::env(SNAP_HARDWARE_ROOT)
 set fpga_part       $::env(FPGACHIP)
 set ip_dir          $root_dir/ip
-set action_root     $::env(ACTION_ROOT)
+#set action_root     $::env(ACTION_ROOT)
 
 set project_name "ethernet_ip_rx"
 set project_dir [file dirname [file dirname [file normalize [info script]]]]
@@ -41,9 +41,9 @@ set_property -dict [list CONFIG.CONST_WIDTH {10} CONFIG.CONST_VAL {0}] [get_bd_c
 make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_ref_clk]
 make_bd_intf_pins_external  [get_bd_intf_pins eth_100g/util_ds_buf_0/CLK_IN_D]
 
-create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 eth_100g/o_rx
-connect_bd_intf_net [get_bd_intf_port eth_100g/o_rx] [get_bd_intf_pins eth_100g/cmac_usplus_0/axis_rx]
-set_property -dict [list CONFIG.CLK_DOMAIN {eth_100g/cmac_usplus_0/gt_txusrclk2} CONFIG.FREQ_HZ {1611328125}] [get_bd_intf_ports o_rx]
+create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 o_rx
+#connect_bd_intf_net [get_bd_intf_port o_rx] [get_bd_intf_pins eth_100g/cmac_usplus_0/axis_rx]
+#set_property -dict [list CONFIG.CLK_DOMAIN {ethernet_ip_rx_cmac_usplus_0_0_gt_txusrclk2} CONFIG.FREQ_HZ {322265625}] [get_bd_intf_ports o_rx]
 
 create_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 gt_rx 
 connect_bd_intf_net [get_bd_intf_ports gt_rx] [get_bd_intf_pins eth_100g/cmac_usplus_0/gt_rx]
@@ -65,7 +65,17 @@ connect_bd_net [get_bd_pins eth_100g/zeroX12/dout] [get_bd_pins eth_100g/cmac_us
 connect_bd_net [get_bd_pins eth_100g/zeroX16/dout] [get_bd_pins eth_100g/cmac_usplus_0/drp_di]
 
 create_bd_port -dir I -type rst rst
+set_property CONFIG.POLARITY ACTIVE_HIGH [get_bd_ports rst]
 connect_bd_net [get_bd_pins rst] [get_bd_pins eth_100g/cmac_usplus_0/core_rx_reset]
+
+## Testing clock converter
+
+create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 eth_100g/axis_clock_converter_0
+connect_bd_intf_net [get_bd_intf_pins eth_100g/cmac_usplus_0/axis_rx] [get_bd_intf_pins eth_100g/axis_clock_converter_0/S_AXIS]
+connect_bd_intf_net [get_bd_intf_pins o_rx] [get_bd_intf_pins eth_100g/axis_clock_converter_0/M_AXIS]
+connect_bd_net [get_bd_pins eth_100g/cmac_usplus_0/gt_txusrclk2] [get_bd_pins eth_100g/axis_clock_converter_0/s_axis_aclk]
+make_bd_pins_external  [get_bd_pins eth_100g/axis_clock_converter_0/m_axis_aclk]
+set_property name o_rx_aclk [get_bd_pins eth_100g/m_axis_aclk_0]
 
 ## To enable TX
 
