@@ -2,7 +2,7 @@
 ############################################################################
 ##
 ## Copyright 2018 Alpha Data Parallel Systems Ltd.
-## Copyright 2019 Filip Leonarski, PSI
+## Copyright 2019 Paul Scherrer Institute
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License");
 ## you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 ############################################################################
 ############################################################################
 
-
+## FL: Which clock should go as init clock??
 create_clock -period 5.000 [get_ports init_clk_p]
 set_property PACKAGE_PIN N33 [get_ports init_clk_p]
 set_property PACKAGE_PIN N34 [get_ports init_clk_n]
@@ -62,6 +62,6 @@ set_property PACKAGE_PIN AA40 [get_ports {gt_tx_gt_port_6_p}]    ; #QSFP0_TX6_P
 set_property PACKAGE_PIN Y43  [get_ports {gt_tx_gt_port_7_n}]    ; #QSFP0_TX7_N
 set_property PACKAGE_PIN Y42  [get_ports {gt_tx_gt_port_7_p}]    ; #QSFP0_TX7_P
 
-# Using QSFP28 pin instead of EMCCLK pin
+## FL: Using QSFP-DD clock at 161.1328125 MHz
 set_property PACKAGE_PIN AD39   [get_ports {gt_ref_clk_n}]         ; #QSFP_CLK_PIN_N
 set_property PACKAGE_PIN AD38   [get_ports {gt_ref_clk_p}]         ; #QSFP_CLK_PIN_P
