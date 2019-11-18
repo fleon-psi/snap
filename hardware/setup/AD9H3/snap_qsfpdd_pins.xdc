@@ -19,14 +19,6 @@
 ############################################################################
 ############################################################################
 
-## FL: Which clock should go as init clock??
-create_clock -period 5.000 [get_ports init_clk_p]
-set_property PACKAGE_PIN N33 [get_ports init_clk_p]
-set_property PACKAGE_PIN N34 [get_ports init_clk_n]
-
-#set_property IOSTANDARD LVDS [get_ports init_clk_p]
-#set_property IOSTANDARD LVDS [get_ports init_clk_n]
-
 set_property PACKAGE_PIN AU46 [get_ports {gt_rx_gt_port_0_n}]    ; #QSFP0_RX0_N
 set_property PACKAGE_PIN AU45 [get_ports {gt_rx_gt_port_0_p}]    ; #QSFP0_RX0_P
 set_property PACKAGE_PIN AT44 [get_ports {gt_rx_gt_port_1_n}]    ; #QSFP0_RX1_N
@@ -44,7 +36,6 @@ set_property PACKAGE_PIN AM43 [get_ports {gt_rx_gt_port_6_p}]    ; #QSFP0_RX6_P
 set_property PACKAGE_PIN AL46 [get_ports {gt_rx_gt_port_7_n}]    ; #QSFP0_RX7_N
 set_property PACKAGE_PIN AL45 [get_ports {gt_rx_gt_port_7_p}]    ; #QSFP0_RX7_P
 
-#set_property PACKAGE_PIN D31  [get_ports {}]    ; #QSFP0_SEL_1V8_L
 set_property PACKAGE_PIN AH43 [get_ports {gt_tx_gt_port_0_n}]    ; #QSFP0_TX0_N
 set_property PACKAGE_PIN AH42 [get_ports {gt_tx_gt_port_0_p}]    ; #QSFP0_TX0_P
 set_property PACKAGE_PIN AE41 [get_ports {gt_tx_gt_port_1_n}]    ; #QSFP0_TX1_N
