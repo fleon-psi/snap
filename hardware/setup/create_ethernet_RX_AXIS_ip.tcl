@@ -30,10 +30,10 @@ addip axis_clock_converter axis_clock_converter_rx
 create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 o_rx_axis
 #create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 i_tx_axis
 
-set_property CONFIG.TDATA_NUM_BYTES 64 [get_bd_intf_ports i_tx_axis]
-set_property CONFIG.HAS_TLAST 1 [get_bd_intf_ports i_tx_axis]
-set_property CONFIG.HAS_TKEEP 1 [get_bd_intf_ports i_tx_axis]
-set_property CONFIG.FREQ_HZ 250000000 [get_bd_intf_ports i_tx_axis]
+#set_property CONFIG.TDATA_NUM_BYTES 64 [get_bd_intf_ports i_tx_axis]
+#set_property CONFIG.HAS_TLAST 1 [get_bd_intf_ports i_tx_axis]
+#set_property CONFIG.HAS_TKEEP 1 [get_bd_intf_ports i_tx_axis]
+#set_property CONFIG.FREQ_HZ 250000000 [get_bd_intf_ports i_tx_axis]
 
 create_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 i_gt_rx 
 #create_bd_intf_port -mode Master -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 o_gt_tx 

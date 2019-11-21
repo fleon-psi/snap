@@ -34,8 +34,9 @@ set_property CONFIG.TDATA_NUM_BYTES 64 [get_bd_intf_ports i_tx_axis]
 set_property CONFIG.HAS_TLAST 1 [get_bd_intf_ports i_tx_axis]
 set_property CONFIG.HAS_TKEEP 1 [get_bd_intf_ports i_tx_axis]
 set_property CONFIG.FREQ_HZ 250000000 [get_bd_intf_ports i_tx_axis]
+set_property CONFIG.TUSER_WIDTH 1 [get_bd_intf_ports i_tx_axis]
 
-Wcreate_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 i_gt_rx 
+#create_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 i_gt_rx 
 create_bd_intf_port -mode Master -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 o_gt_tx 
 
 create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 i_gt_ref_clk
@@ -70,7 +71,7 @@ connect_bd_net [get_bd_pins zero/dout] [get_bd_pins cmac_usplus_0/drp_we]
 connect_bd_net [get_bd_pins zero/dout] [get_bd_pins cmac_usplus_0/drp_en]
 connect_bd_net [get_bd_pins zero/dout] [get_bd_pins cmac_usplus_0/gtwiz_reset_tx_datapath]
 connect_bd_net [get_bd_pins zero/dout] [get_bd_pins cmac_usplus_0/gtwiz_reset_rx_datapath]
-connect_bd_net [get_bd_pins zero/dout] [get_bd_pins cmac_usplus_0/ctl_rsfec_ieee_error_indication_mode]
+#connect_bd_net [get_bd_pins zero/dout] [get_bd_pins cmac_usplus_0/ctl_rsfec_ieee_error_indication_mode]
 connect_bd_net [get_bd_pins zeroX10/dout] [get_bd_pins cmac_usplus_0/drp_addr]
 connect_bd_net [get_bd_pins zeroX12/dout] [get_bd_pins cmac_usplus_0/gt_loopback_in]
 connect_bd_net [get_bd_pins zeroX16/dout] [get_bd_pins cmac_usplus_0/drp_di]
