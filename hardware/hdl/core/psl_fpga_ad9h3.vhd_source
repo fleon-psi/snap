@@ -59,6 +59,14 @@ ENTITY psl_fpga IS
     gt_rx_gt_port_2_p                   : IN STD_LOGIC;
     gt_rx_gt_port_3_n                   : IN STD_LOGIC;
     gt_rx_gt_port_3_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_4_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_4_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_5_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_5_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_6_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_6_p                   : IN STD_LOGIC;
+    gt_rx_gt_port_7_n                   : IN STD_LOGIC;
+    gt_rx_gt_port_7_p                   : IN STD_LOGIC;
     gt_tx_gt_port_0_n                   : OUT STD_LOGIC;
     gt_tx_gt_port_0_p                   : OUT STD_LOGIC;
     gt_tx_gt_port_1_n                   : OUT STD_LOGIC;
@@ -67,6 +75,14 @@ ENTITY psl_fpga IS
     gt_tx_gt_port_2_p                   : OUT STD_LOGIC;
     gt_tx_gt_port_3_n                   : OUT STD_LOGIC;
     gt_tx_gt_port_3_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_4_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_4_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_5_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_5_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_6_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_6_p                   : OUT STD_LOGIC;
+    gt_tx_gt_port_7_n                   : OUT STD_LOGIC;
+    gt_tx_gt_port_7_p                   : OUT STD_LOGIC;
 #endif
     -- CAPI PSL Interface
     --
@@ -236,8 +252,6 @@ Component psl_accel
 -- TODO:    c0_ddr4_ten                         : OUT   STD_LOGIC;
 #endif
 #ifdef CONFIG_ENABLE_ETHERNET
-    init_clk_n                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-    init_clk_p                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
     gt_ref_clk_n                        : IN STD_LOGIC; 
     gt_ref_clk_p                        : IN STD_LOGIC;
     gt_rx_gt_port_0_n                   : IN STD_LOGIC;
@@ -537,8 +551,6 @@ BEGIN
       c0_ddr4_ck_t                      => c0_ddr4_ck_t,
 #endif
 #ifdef CONFIG_ENABLE_ETHERNET
-    init_clk_n                          => init_clk_n,   
-    init_clk_p                          => init_clk_p,
     gt_ref_clk_n                        => gt_ref_clk_n,
     gt_ref_clk_p                        => gt_ref_clk_p,
     gt_rx_gt_port_0_n                   => gt_rx_gt_port_0_n,
@@ -549,6 +561,14 @@ BEGIN
     gt_rx_gt_port_2_p                   => gt_rx_gt_port_2_p,
     gt_rx_gt_port_3_n                   => gt_rx_gt_port_3_n,
     gt_rx_gt_port_3_p                   => gt_rx_gt_port_3_p,
+    gt_rx_gt_port_4_n                   => gt_rx_gt_port_4_n,
+    gt_rx_gt_port_4_p                   => gt_rx_gt_port_4_p,
+    gt_rx_gt_port_5_n                   => gt_rx_gt_port_5_n,
+    gt_rx_gt_port_5_p                   => gt_rx_gt_port_5_p,
+    gt_rx_gt_port_6_n                   => gt_rx_gt_port_6_n,
+    gt_rx_gt_port_6_p                   => gt_rx_gt_port_6_p,
+    gt_rx_gt_port_7_n                   => gt_rx_gt_port_7_n,
+    gt_rx_gt_port_7_p                   => gt_rx_gt_port_7_p,
     gt_tx_gt_port_0_n                   => gt_tx_gt_port_0_n,
     gt_tx_gt_port_0_p                   => gt_tx_gt_port_0_p,
     gt_tx_gt_port_1_n                   => gt_tx_gt_port_1_n,

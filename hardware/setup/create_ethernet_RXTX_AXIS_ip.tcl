@@ -39,9 +39,9 @@ set_property CONFIG.TUSER_WIDTH 1 [get_bd_intf_ports i_tx_axis]
 create_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 i_gt_rx 
 create_bd_intf_port -mode Master -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 o_gt_tx 
 
-create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 i_gt_ref_clk
+create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 i_gt_ref
 create_bd_port -dir I -type clk -freq_hz 250000000 i_capi_clk
-set_property CONFIG.FREQ_HZ 161132812 [get_bd_intf_ports i_gt_ref_clk]
+set_property CONFIG.FREQ_HZ 161132812 [get_bd_intf_ports i_gt_ref]
 create_bd_port -dir I -type rst i_rst
 
 
@@ -95,7 +95,7 @@ connect_bd_net [get_bd_pins one/dout] [get_bd_pins cmac_usplus_0/ctl_tx_rsfec_en
 
 connect_bd_net [get_bd_pins i_capi_clk] [get_bd_pins cmac_usplus_0/drp_clk]
 connect_bd_net [get_bd_pins i_capi_clk] [get_bd_pins cmac_usplus_0/init_clk]
-connect_bd_intf_net [get_bd_intf_ports i_gt_ref_clk] [get_bd_intf_pins cmac_usplus_0/gt_ref_clk]
+connect_bd_intf_net [get_bd_intf_ports i_gt_ref] [get_bd_intf_pins cmac_usplus_0/gt_ref_clk]
 
 set_property CONFIG.POLARITY ACTIVE_HIGH [get_bd_ports i_rst]
 connect_bd_net [get_bd_pins i_rst] [get_bd_pins cmac_usplus_0/core_rx_reset]

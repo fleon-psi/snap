@@ -228,8 +228,6 @@ ENTITY psl_accel IS
     pcie_rc1_txp                        : OUT   STD_LOGIC_VECTOR(3 downto 0);
 #endif
 #ifdef CONFIG_ENABLE_ETHERNET
-    init_clk_n                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-    init_clk_p                          : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
     gt_ref_clk_n                        : IN STD_LOGIC; 
     gt_ref_clk_p                        : IN STD_LOGIC;
     gt_rx_gt_port_0_n                   : IN STD_LOGIC;
@@ -500,18 +498,27 @@ ARCHITECTURE psl_accel OF psl_accel IS
     din_eth0_TKEEP : IN STD_LOGIC_VECTOR (63 downto 0);
     din_eth0_TUSER : IN STD_LOGIC_VECTOR (0 downto 0);
     din_eth0_TLAST : IN STD_LOGIC;
---    din_eth0_TSTRB : IN STD_LOGIC_VECTOR (63 downto 0);
---    din_eth0_TID : IN STD_LOGIC_VECTOR (4 downto 0);
---    din_eth0_TDEST : IN STD_LOGIC_VECTOR (4 downto 0);
+
     din_eth1_TDATA : IN STD_LOGIC_VECTOR (511 downto 0);
     din_eth1_TVALID : IN STD_LOGIC;
     din_eth1_TREADY : OUT STD_LOGIC;
     din_eth1_TKEEP : IN STD_LOGIC_VECTOR (63 downto 0);
     din_eth1_TUSER : IN STD_LOGIC_VECTOR (0 downto 0);
     din_eth1_TLAST : IN STD_LOGIC;
---    din_eth1_TSTRB : IN STD_LOGIC_VECTOR (63 downto 0);
---    din_eth1_TID : IN STD_LOGIC_VECTOR (4 downto 0);
---    din_eth1_TDEST : IN STD_LOGIC_VECTOR (4 downto 0);
+
+    dout_eth0_TDATA : OUT STD_LOGIC_VECTOR (511 downto 0);
+    dout_eth0_TVALID : OUT STD_LOGIC;
+    dout_eth0_TREADY : IN STD_LOGIC;
+    dout_eth0_TKEEP : OUT STD_LOGIC_VECTOR (63 downto 0);
+    dout_eth0_TUSER : OUT STD_LOGIC_VECTOR (0 downto 0);
+    dout_eth0_TLAST : OUT STD_LOGIC;
+
+    dout_eth1_TDATA : OUT STD_LOGIC_VECTOR (511 downto 0);
+    dout_eth1_TVALID : OUT STD_LOGIC;
+    dout_eth1_TREADY : IN STD_LOGIC;
+    dout_eth1_TKEEP : OUT STD_LOGIC_VECTOR (63 downto 0);
+    dout_eth1_TUSER : OUT STD_LOGIC_VECTOR (0 downto 0);
+    dout_eth1_TLAST : OUT STD_LOGIC;
 #endif
 
       --
@@ -807,30 +814,43 @@ ARCHITECTURE psl_accel OF psl_accel IS
   --
   -- ETHERNET IP
   --
-    COMPONENT ethernet_ip_rx
+    COMPONENT ethernet_ip_rxtx
     PORT(
-        gt_ref_clk_n            : IN STD_LOGIC;
-        gt_ref_clk_p            : IN STD_LOGIC;
-        gt_rx_gt_port_0_n       : IN STD_LOGIC;
-        gt_rx_gt_port_0_p       : IN STD_LOGIC;
-        gt_rx_gt_port_1_n       : IN STD_LOGIC;
-        gt_rx_gt_port_1_p	: IN STD_LOGIC;
-        gt_rx_gt_port_2_n	: IN STD_LOGIC;
-        gt_rx_gt_port_2_p       : IN STD_LOGIC;
-        gt_rx_gt_port_3_n       : IN STD_LOGIC;
-        gt_rx_gt_port_3_p       : IN STD_LOGIC;
-        init_clk_n              : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-        init_clk_p              : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-        o_rx_tdata              : OUT STD_LOGIC_VECTOR(511 DOWNTO 0);
-        o_rx_tkeep              : OUT STD_LOGIC_VECTOR(63 DOWNTO 0);
-        o_rx_tuser              : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
-        o_rx_tlast              : OUT STD_LOGIC;
-        o_rx_tvalid             : OUT STD_LOGIC;
-        o_rx_tready             : IN STD_LOGIC;
-        rst                     : IN STD_LOGIC;
-	m_axis_aclk_0		: IN STD_LOGIC;
+        i_gt_ref_clk_n            : IN STD_LOGIC;
+        i_gt_ref_clk_p            : IN STD_LOGIC;
+        i_gt_rx_gt_port_0_n       : IN STD_LOGIC;
+        i_gt_rx_gt_port_0_p       : IN STD_LOGIC;
+        i_gt_rx_gt_port_1_n       : IN STD_LOGIC;
+        i_gt_rx_gt_port_1_p	  : IN STD_LOGIC;
+        i_gt_rx_gt_port_2_n	  : IN STD_LOGIC;
+        i_gt_rx_gt_port_2_p       : IN STD_LOGIC;
+        i_gt_rx_gt_port_3_n       : IN STD_LOGIC;
+        i_gt_rx_gt_port_3_p       : IN STD_LOGIC;
+        o_gt_tx_gt_port_0_n       : OUT STD_LOGIC;
+        o_gt_tx_gt_port_0_p       : OUT STD_LOGIC;
+        o_gt_tx_gt_port_1_n       : OUT STD_LOGIC;
+        o_gt_tx_gt_port_1_p	  : OUT STD_LOGIC;
+        o_gt_tx_gt_port_2_n	  : OUT STD_LOGIC;
+        o_gt_tx_gt_port_2_p       : OUT STD_LOGIC;
+        o_gt_tx_gt_port_3_n       : OUT STD_LOGIC;
+        o_gt_tx_gt_port_3_p       : OUT STD_LOGIC;
+        i_capi_clk                : IN STD_LOGIC;
+        i_rst                     : IN STD_LOGIC;
+        o_rx_axis_tdata           : OUT STD_LOGIC_VECTOR(511 DOWNTO 0);
+        o_rx_axis_tkeep           : OUT STD_LOGIC_VECTOR(63 DOWNTO 0);
+        o_rx_axis_tuser           : OUT STD_LOGIC_VECTOR(0 DOWNTO 0);
+        o_rx_axis_tlast           : OUT STD_LOGIC;
+        o_rx_axis_tvalid          : OUT STD_LOGIC;
+        o_rx_axis_tready          : IN STD_LOGIC;
+        i_tx_axis_tdata           : IN STD_LOGIC_VECTOR(511 DOWNTO 0);
+        i_tx_axis_tkeep           : IN STD_LOGIC_VECTOR(63 DOWNTO 0);
+        i_tx_axis_tuser           : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+        i_tx_axis_tlast           : IN STD_LOGIC;
+        i_tx_axis_tvalid          : IN STD_LOGIC;
+        i_tx_axis_tready          : OUT STD_LOGIC
     );
     END COMPONENT;
+
 #endif
 
 #ifdef CONFIG_ENABLE_BRAM
@@ -1365,12 +1385,26 @@ ARCHITECTURE psl_accel OF psl_accel IS
     SIGNAL eth0_rx_tready               : STD_LOGIC;
     SIGNAL eth0_rx_tuser                : STD_LOGIC_VECTOR(0 DOWNTO 0);
 
+    SIGNAL eth0_tx_tdata                : STD_LOGIC_VECTOR(511 DOWNTO 0);
+    SIGNAL eth0_tx_tkeep                : STD_LOGIC_VECTOR(63 DOWNTO 0);
+    SIGNAL eth0_tx_tlast                : STD_LOGIC;
+    SIGNAL eth0_tx_tvalid               : STD_LOGIC;
+    SIGNAL eth0_tx_tready               : STD_LOGIC;
+    SIGNAL eth0_tx_tuser                : STD_LOGIC_VECTOR(0 DOWNTO 0);
+
     SIGNAL eth1_rx_tdata                : STD_LOGIC_VECTOR(511 DOWNTO 0);
     SIGNAL eth1_rx_tkeep                : STD_LOGIC_VECTOR(63 DOWNTO 0);
     SIGNAL eth1_rx_tlast                : STD_LOGIC;
     SIGNAL eth1_rx_tvalid               : STD_LOGIC;
     SIGNAL eth1_rx_tready               : STD_LOGIC;
     SIGNAL eth1_rx_tuser                : STD_LOGIC_VECTOR(0 DOWNTO 0);
+
+    SIGNAL eth1_tx_tdata                : STD_LOGIC_VECTOR(511 DOWNTO 0);
+    SIGNAL eth1_tx_tkeep                : STD_LOGIC_VECTOR(63 DOWNTO 0);
+    SIGNAL eth1_tx_tlast                : STD_LOGIC;
+    SIGNAL eth1_tx_tvalid               : STD_LOGIC;
+    SIGNAL eth1_tx_tready               : STD_LOGIC;
+    SIGNAL eth1_tx_tuser                : STD_LOGIC_VECTOR(0 DOWNTO 0);
 
     SIGNAL eth_rst                      : STD_LOGIC;
 #endif
@@ -1640,31 +1674,29 @@ BEGIN
     din_eth0_TVALID                   => eth0_rx_tvalid,
     din_eth0_TREADY                   => eth0_rx_tready,
     din_eth0_TKEEP                    => eth0_rx_tkeep,
-    din_eth0_TSTRB                    => (others => '0'),
     din_eth0_TUSER                    => eth0_rx_tuser,
     din_eth0_TLAST                    => eth0_rx_tlast,
-    din_eth0_TID                      => (others => '0'),
-    din_eth0_TDEST                    => (others => '0'),
 
     din_eth1_TDATA                    => eth1_rx_tdata,
     din_eth1_TVALID                   => eth1_rx_tvalid,
     din_eth1_TREADY                   => eth1_rx_tready,
     din_eth1_TKEEP                    => eth1_rx_tkeep,
-    din_eth1_TSTRB                    => (others => '0'),
     din_eth1_TUSER                    => eth1_rx_tuser,
     din_eth1_TLAST                    => eth1_rx_tlast,
-    din_eth1_TID                      => (others => '0'),
-    din_eth1_TDEST                    => (others => '0'),
 
---    dout_eth0_TDATA                   => act_payload_from_user_tdata,
---    dout_eth0_TVALID                  => act_payload_from_user_tvalid,
---    dout_eth0_TREADY                  => act_payload_from_user_tready,
---    dout_eth0_TKEEP                   => act_payload_from_user_tkeep,
---    dout_eth0_TSTRB                   => open,
---    dout_eth0_TUSER                   => open,
---    dout_eth0_TLAST                   => act_payload_from_user_tlast,
---    dout_eth0_TID                     => open,
---    dout_eth0_TDEST                   => open,
+    dout_eth0_TDATA                   => eth0_tx_tdata,
+    dout_eth0_TVALID                  => eth0_tx_tvalid,
+    dout_eth0_TREADY                  => eth0_tx_tready,
+    dout_eth0_TKEEP                   => eth0_tx_tkeep,
+    dout_eth0_TUSER                   => eth0_tx_tuser,
+    dout_eth0_TLAST                   => eth0_tx_tlast,
+
+    dout_eth1_TDATA                   => eth1_tx_tdata,
+    dout_eth1_TVALID                  => eth1_tx_tvalid,
+    dout_eth1_TREADY                  => eth1_tx_tready,
+    dout_eth1_TKEEP                   => eth1_tx_tkeep,
+    dout_eth1_TUSER                   => eth1_tx_tuser,
+    dout_eth1_TLAST                   => eth1_tx_tlast,
 #endif
       --
       -- AXI Control Register Interface
@@ -2285,51 +2317,84 @@ BEGIN
   --
   -- ETHERNET IP
   --
-    ethernet_eth0: ethernet_ip_rx
+    ethernet_eth0: ethernet_ip_rxtx
     port map(
-        gt_ref_clk_n                  => gt_ref_clk_n,
-        gt_ref_clk_p                  => gt_ref_clk_p,
-        gt_rx_gt_port_0_n             => gt_rx_gt_port_0_n,
-        gt_rx_gt_port_0_p             => gt_rx_gt_port_0_p,
-        gt_rx_gt_port_1_n             => gt_rx_gt_port_1_n,
-        gt_rx_gt_port_1_p             => gt_rx_gt_port_1_p,
-        gt_rx_gt_port_2_n             => gt_rx_gt_port_2_n,
-        gt_rx_gt_port_2_p             => gt_rx_gt_port_2_p,
-        gt_rx_gt_port_3_n             => gt_rx_gt_port_3_n,
-        gt_rx_gt_port_3_p             => gt_rx_gt_port_3_p,
-        init_clk_n                    => init_clk_n,
-        init_clk_p                    => init_clk_p,
-        o_rx_tdata                    => eth0_rx_tdata,
-        o_rx_tkeep                    => eth0_rx_tkeep,
-        o_rx_tlast                    => eth0_rx_tlast,
-        o_rx_tvalid                   => eth0_rx_tvalid,
-        o_rx_tuser                    => eth0_rx_tuser,
-        rst                           => eth_rst,
---- ????? CLOCK ????
-	m_axis_aclk_0		      => ha_pclock
+        i_gt_ref_clk_n                  => gt_ref_clk_n,
+        i_gt_ref_clk_p                  => gt_ref_clk_p,
+        i_gt_rx_gt_port_0_n             => gt_rx_gt_port_0_n,
+        i_gt_rx_gt_port_0_p             => gt_rx_gt_port_0_p,
+        i_gt_rx_gt_port_1_n             => gt_rx_gt_port_1_n,
+        i_gt_rx_gt_port_1_p             => gt_rx_gt_port_1_p,
+        i_gt_rx_gt_port_2_n             => gt_rx_gt_port_2_n,
+        i_gt_rx_gt_port_2_p             => gt_rx_gt_port_2_p,
+        i_gt_rx_gt_port_3_n             => gt_rx_gt_port_3_n,
+        i_gt_rx_gt_port_3_p             => gt_rx_gt_port_3_p,
+
+        o_gt_tx_gt_port_0_n             => gt_tx_gt_port_0_n,
+        o_gt_tx_gt_port_0_p             => gt_tx_gt_port_0_p,
+        o_gt_tx_gt_port_1_n             => gt_tx_gt_port_1_n,
+        o_gt_tx_gt_port_1_p             => gt_tx_gt_port_1_p,
+        o_gt_tx_gt_port_2_n             => gt_tx_gt_port_2_n,
+        o_gt_tx_gt_port_2_p             => gt_tx_gt_port_2_p,
+        o_gt_tx_gt_port_3_n             => gt_tx_gt_port_3_n,
+        o_gt_tx_gt_port_3_p             => gt_tx_gt_port_3_p,
+
+        o_rx_axis_tdata                 => eth0_rx_tdata,
+        o_rx_axis_tkeep                 => eth0_rx_tkeep,
+        o_rx_axis_tlast                 => eth0_rx_tlast,
+        o_rx_axis_tvalid                => eth0_rx_tvalid,
+        o_rx_axis_tuser                 => eth0_rx_tuser,
+        o_rx_axis_tready                => eth0_rx_tready,
+
+        i_tx_axis_tdata                 => eth0_tx_tdata,
+        i_tx_axis_tkeep                 => eth0_tx_tkeep,
+        i_tx_axis_tlast                 => eth0_tx_tlast,
+        i_tx_axis_tvalid                => eth0_tx_tvalid,
+        i_tx_axis_tuser                 => eth0_tx_tuser,
+        i_tx_axis_tready                => eth0_tx_tready,
+
+        i_rst                           => eth_rst,
+	i_capi_clk	                => ha_pclock
     );
-    ethernet_eth1: ethernet_ip_rx
+
+    ethernet_eth1: ethernet_ip_rxtx
     port map(
-        gt_ref_clk_n                  => gt_ref_clk_n,
-        gt_ref_clk_p                  => gt_ref_clk_p,
-        gt_rx_gt_port_0_n             => gt_rx_gt_port_4_n,
-        gt_rx_gt_port_0_p             => gt_rx_gt_port_4_p,
-        gt_rx_gt_port_1_n             => gt_rx_gt_port_5_n,
-        gt_rx_gt_port_1_p             => gt_rx_gt_port_5_p,
-        gt_rx_gt_port_2_n             => gt_rx_gt_port_6_n,
-        gt_rx_gt_port_2_p             => gt_rx_gt_port_6_p,
-        gt_rx_gt_port_3_n             => gt_rx_gt_port_7_n,
-        gt_rx_gt_port_3_p             => gt_rx_gt_port_7_p,
-        init_clk_n                    => init_clk_n,
-        init_clk_p                    => init_clk_p,
-        o_rx_tdata                    => eth1_rx_tdata,
-        o_rx_tkeep                    => eth1_rx_tkeep,
-        o_rx_tlast                    => eth1_rx_tlast,
-        o_rx_tvalid                   => eth1_rx_tvalid,
-        o_rx_tuser                    => eth1_rx_tuser,
-        rst                           => eth_rst,
---- ????? CLOCK ????
-	m_axis_aclk_0		      => ha_plock
+        i_gt_ref_clk_n                  => gt_ref_clk_n,
+        i_gt_ref_clk_p                  => gt_ref_clk_p,
+        i_gt_rx_gt_port_0_n             => gt_rx_gt_port_4_n,
+        i_gt_rx_gt_port_0_p             => gt_rx_gt_port_4_p,
+        i_gt_rx_gt_port_1_n             => gt_rx_gt_port_5_n,
+        i_gt_rx_gt_port_1_p             => gt_rx_gt_port_5_p,
+        i_gt_rx_gt_port_2_n             => gt_rx_gt_port_6_n,
+        i_gt_rx_gt_port_2_p             => gt_rx_gt_port_6_p,
+        i_gt_rx_gt_port_3_n             => gt_rx_gt_port_7_n,
+        i_gt_rx_gt_port_3_p             => gt_rx_gt_port_7_p,
+
+        o_gt_tx_gt_port_0_n             => gt_tx_gt_port_4_n,
+        o_gt_tx_gt_port_0_p             => gt_tx_gt_port_4_p,
+        o_gt_tx_gt_port_1_n             => gt_tx_gt_port_5_n,
+        o_gt_tx_gt_port_1_p             => gt_tx_gt_port_5_p,
+        o_gt_tx_gt_port_2_n             => gt_tx_gt_port_6_n,
+        o_gt_tx_gt_port_2_p             => gt_tx_gt_port_6_p,
+        o_gt_tx_gt_port_3_n             => gt_tx_gt_port_7_n,
+        o_gt_tx_gt_port_3_p             => gt_tx_gt_port_7_p,
+
+        o_rx_axis_tdata                 => eth1_rx_tdata,
+        o_rx_axis_tkeep                 => eth1_rx_tkeep,
+        o_rx_axis_tlast                 => eth1_rx_tlast,
+        o_rx_axis_tvalid                => eth1_rx_tvalid,
+        o_rx_axis_tuser                 => eth1_rx_tuser,
+        o_rx_axis_tready                => eth1_rx_tready,
+
+        i_tx_axis_tdata                 => eth1_tx_tdata,
+        i_tx_axis_tkeep                 => eth1_tx_tkeep,
+        i_tx_axis_tlast                 => eth1_tx_tlast,
+        i_tx_axis_tvalid                => eth1_tx_tvalid,
+        i_tx_axis_tuser                 => eth1_tx_tuser,
+        i_tx_axis_tready                => eth1_tx_tready,
+
+        i_rst                           => eth_rst,
+	i_capi_clk	  	        => ha_pclock
     );
 #endif
 
