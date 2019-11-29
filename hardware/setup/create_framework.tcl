@@ -228,24 +228,21 @@ if { $eth_used == TRUE } {
   puts "                        adding Ethernet block design"
   set_property  ip_repo_paths [concat [get_property ip_repo_paths [current_project]] $ip_dir] [current_project] >> $log_file
   update_ip_catalog -rebuild -scan_changes >> $log_file
-  set_property  ip_repo_paths [concat [get_property ip_repo_paths [current_project]] $root_dir/hdl/ethernet/ip_repo] [current_project] >> $log_file
-  update_ip_catalog -rebuild -scan_changes >> $log_file
 
   # Commented below line for make model, uncomment for make image
+  add_files -norecurse  $ip_dir/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd  >> $log_file
+  export_ip_user_files -of_objects  [get_files  $ip_dir/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd] -no_script -sync -force -quiet >> $log_file
+  generate_target -force all [get_files $ip_dir/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd] >> $log_file
 
-  add_files -norecurse  $ip_dir/ethernet_ip/ethernet_ip.srcs/sources_1/bd/ethernet_ip/ethernet_ip.bd  >> $log_file
-  export_ip_user_files -of_objects  [get_files  $ip_dir/ethernet_ip/ethernet_ip.srcs/sources_1/bd/ethernet_ip/ethernet_ip.bd] -no_script -sync -force -quiet >> $log_file
-  generate_target -force all [get_files $ip_dir/ethernet_ip/ethernet_ip.srcs/sources_1/bd/ethernet_ip/ethernet_ip.bd] >> $log_file
+  create_ip_run [get_files -of_objects [get_fileset sources_1] $ip_dir/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd] >> $log_file
 
-  create_ip_run [get_files -of_objects [get_fileset sources_1] $ip_dir/ethernet_ip/ethernet_ip.srcs/sources_1/bd/ethernet_ip/ethernet_ip.bd] >> $log_file
-  launch_runs ethernet_ip_cmac_usplus_0_0_synth_1 >> $log_file
-  wait_on_run ethernet_ip_cmac_usplus_0_0_synth_1 >> $log_file
-  launch_runs ethernet_ip_util_ds_buf_0_0_synth_1 >> $log_file
-  wait_on_run ethernet_ip_util_ds_buf_0_0_synth_1 >> $log_file
-  launch_runs ethernet_ip_lbus_axis_converter_0_0_synth_1 >> $log_file
-  wait_on_run ethernet_ip_lbus_axis_converter_0_0_synth_1 >> $log_file
-  launch_runs ethernet_ip_GULF_Stream_0_0_synth_1 >> $log_file
-  wait_on_run ethernet_ip_GULF_Stream_0_0_synth_1 >> $log_file
+  launch_runs qsfpdd_cmac_usplus_eth1_0_synth_1 >> $log_file
+  launch_runs qsfpdd_axis_clock_converter_rx_eth1_0_synth_1 >> $log_file
+  launch_runs qsfpdd_axis_clock_converter_tx_eth1_0_synth_1 >> $log_file
+
+  wait_on_run qsfpdd_cmac_usplus_eth1_0_synth_1 >> $log_file
+  wait_on_run qsfpdd_axis_clock_converter_rx_eth1_0_synth_1 >> $log_file
+  wait_on_run qsfpdd_axis_clock_converter_tx_eth1_0_synth_1 >> $log_file
 }
 
 # Add NVME
