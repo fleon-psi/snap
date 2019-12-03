@@ -101,7 +101,7 @@ set_property STEPS.SYNTH_DESIGN.ARGS.NO_LC                     true    [get_runs
 set_property STEPS.SYNTH_DESIGN.ARGS.FLATTEN_HIERARCHY         rebuilt [get_runs synth_1]
 # Implementation
   if { ($fpga_card == "AD9H3") } {
-        set_property strategy Performance_Explore [get_runs impl_1]
+        set_property strategy Performance_ExplorePostRoutePhysOpt [get_runs impl_1]
      }
 set_property STEPS.OPT_DESIGN.ARGS.DIRECTIVE Explore [get_runs impl_1]
 set_property STEPS.PLACE_DESIGN.ARGS.DIRECTIVE Explore [get_runs impl_1]
@@ -236,13 +236,16 @@ if { $eth_used == TRUE } {
 
   create_ip_run [get_files -of_objects [get_fileset sources_1] $ip_dir/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd] >> $log_file
 
-  launch_runs qsfpdd_cmac_usplus_eth1_0_synth_1 >> $log_file
-  launch_runs qsfpdd_axis_clock_converter_rx_eth1_0_synth_1 >> $log_file
-  launch_runs qsfpdd_axis_clock_converter_tx_eth1_0_synth_1 >> $log_file
+  launch_runs eth_100G_cmac_usplus_0_0_synth_1 >> $log_file
+  launch_runs eth_100G_axis_clock_converter_0_0_synth_1 >> $log_file
+  launch_runs eth_100G_axis_clock_converter_1_0_synth_1 >> $log_file
+  launch_runs eth_100G_util_vector_logic_0_0_synth_1 >> $log_file
 
-  wait_on_run qsfpdd_cmac_usplus_eth1_0_synth_1 >> $log_file
-  wait_on_run qsfpdd_axis_clock_converter_rx_eth1_0_synth_1 >> $log_file
-  wait_on_run qsfpdd_axis_clock_converter_tx_eth1_0_synth_1 >> $log_file
+  wait_on_run eth_100G_cmac_usplus_0_0_synth_1 >> $log_file
+  wait_on_run eth_100G_axis_clock_converter_0_0_synth_1 >> $log_file
+  wait_on_run eth_100G_axis_clock_converter_1_0_synth_1 >> $log_file
+  wait_on_run eth_100G_util_vector_logic_0_0_synth_1 >> $log_file
+
 }
 
 # Add NVME

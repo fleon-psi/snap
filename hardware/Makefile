@@ -254,28 +254,14 @@ action_hw: prepare_logs
 	fi
 	@echo -e "[CONFIG ACTION HW....] done  `date +"%T %a %b %d %Y"`";
 
-.create_ethernet_done: prepare_logs .create_ethernet_dependencies
+.create_ethernet_done: prepare_logs
 	@echo -e "[CREATE ETHERNET IP..] start `date +"%T %a %b %d %Y"`";
-	echo "Calling make -C $(SNAP_HARDWARE_ROOT)/hdl/ethernet/ip_repo/assembled_ips" >> $(LOGS_DIR)/ethernet_ip_make.log; \
-	$(MAKE) -kC $(SNAP_HARDWARE_ROOT)/hdl/ethernet/ip_repo/assembled_ips; \
-	if [ $$? -ne 0 ]; then \
-		echo -e "						Error: please look into $(LOGS_DIR)/ethernet_ip_make.log"; exit -1; \
-	fi; 
-	@echo -e "			generating FULL Ethernet IP";
-	@rm -rf $(SNAP_HARDWARE_ROOT)/ip/ethernet_ip
-	echo "Calling create_ethernet_ip TCL script" >> $(LOGS_DIR)/ethernet_ip_make.log; 
-	@cd $(BUILD_DIR)  &&  vivado -quiet -mode batch -source $(SETUP_DIR)/create_ethernet_ip.tcl -notrace -log $(LOGS_DIR)/ethernet_ip_make.log -journal $(LOGS_DIR)/ethernet_ip_make.jou >> $(LOGS_DIR)/ethernet_ip_make.log; 
+	@rm -rf $(SNAP_HARDWARE_ROOT)/ip/eth_100G
+	echo "Calling create_eth_100G TCL script" >> $(LOGS_DIR)/eth_100G_make.log; 
+	@echo -e "			generating 100G Ethernet IP";
+	@cd $(BUILD_DIR)  &&  vivado -quiet -mode batch -source $(SETUP_DIR)/create_eth_100G_ip.tcl -notrace -log $(LOGS_DIR)/eth_100G_make.log -journal $(LOGS_DIR)/eth_100G_make.jou >> $(LOGS_DIR)/eth_100G_make.log; 
+	@echo -e "[CREATE ETHERNET IP..] done `date +"%T %a %b %d %Y"`";
 	@touch .create_ethernet_done
-
-.create_ethernet_dependencies: prepare_logs
-	@echo -e "[CREATE ETHERNET IPs.] start `date +"%T %a %b %d %Y"`";
-	echo "Calling make -C $(SNAP_HARDWARE_ROOT)/hdl/ethernet/ip_repo/hls_ips" >> $(LOGS_DIR)/ethernet_ip_make.log; \
-	$(MAKE) -kC $(SNAP_HARDWARE_ROOT)/hdl/ethernet/ip_repo/hls_ips; \
-	if [ $$? -ne 0 ]; then \
-		echo -e "						Error: please look into $(LOGS_DIR)/ethernet_ip_make.log"; exit -1; \
-	fi; 
-	@echo -e "[CREATE ETHERNET IPs.] done  `date +"%T %a %b %d %Y"`";
-	@touch .create_ethernet_dependencies
 
 .create_snap_ip_done:
 	@cd $(BUILD_DIR)  &&  vivado -quiet -mode batch -source $(SETUP_DIR)/create_snap_ip.tcl -notrace -log $(LOGS_DIR)/create_snap_ip.log -journal $(LOGS_DIR)/create_snap_ip.jou
