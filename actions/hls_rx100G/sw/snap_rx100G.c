@@ -35,109 +35,38 @@
 
 #include <snap_tools.h>
 #include <libsnap.h>
-#include <action_changecase.h>
+#include <action_rx100G.h>
 #include <snap_hls_if.h>
 
 int verbose_flag = 0;
 
-static const char *version = GIT_VERSION;
+//static const char *version = GIT_VERSION;
 
 static const char *mem_tab[] = { "HOST_DRAM", "CARD_DRAM", "TYPE_NVME" };
 
-/**
- * @brief	prints valid command line options
- *
- * @param prog	current program's name
- */
-static void usage(const char *prog)
-{
-	printf("Usage: %s [-h] [-v, --verbose] [-V, --version]\n"
-	"  -C, --card <cardno>       can be (0...3)\n"
-	"  -i, --input <file.bin>    input file.\n"
-	"  -o, --output <file.bin>   output file.\n"
-	"  -A, --type-in <CARD_DRAM, HOST_DRAM, ...>.\n"
-	"  -a, --addr-in <addr>      address e.g. in CARD_RAM.\n"
-	"  -D, --type-out <CARD_DRAM,HOST_DRAM, ...>.\n"
-	"  -d, --addr-out <addr>     address e.g. in CARD_RAM.\n"
-	"  -s, --size <size>         size of data.\n"
-	"  -t, --timeout             timeout in sec to wait for done.\n"
-	"  -X, --verify              verify result if possible\n"
-	"  -N, --no-irq              disable Interrupts\n"
-	"\n"
-	"Useful parameters (to be placed before the command):\n"
-	"----------------------------------------------------\n"
-	"SNAP_TRACE=0x0   no debug trace  (default mode)\n"
-	"SNAP_TRACE=0xF   full debug trace\n"
-	"SNAP_CONFIG=FPGA hardware execution   (default mode)\n"
-	"SNAP_CONFIG=CPU  software execution\n"
-	"\n"
-	"Example on a real card:\n"
-	"-----------------------\n"
-        "cd ~/snap && export ACTION_ROOT=~/snap/actions/hls_helloworld\n"
-        "source snap_path.sh\n"
-        "echo locate the slot number used by your card\n"
-        "snap_find_card -v -AALL\n"
-        "echo discover the actions in card in slot 0\n"
-        "snap_maint -vv -C0\n"
-        "\n"
-        "echo clean possible temporary old files \n"
-	"rm /tmp/t2; rm /tmp/t3\n"
-	"echo Prepare the text to process\n"
-	"echo \"Hello world. This is my first CAPI SNAP experience. It's real fun\""
-	" > /tmp/t1\n"
-	"\n"
-	"echo Run the application + hardware action on FPGA\n"
-	"snap_helloworld -i /tmp/t1 -o /tmp/t2\n"
-	"echo Display input file: && cat /tmp/t1\n"
-	"echo Display output file from FPGA executed action -UPPER CASE expected-:"
-	" && cat /tmp/t2\n"
-	"\n"
-	"echo Run the application + software action on CPU\n"
-	"SNAP_CONFIG=CPU  snap_helloworld -i /tmp/t1 -o /tmp/t3\n"
-	"echo Display input file: && cat /tmp/t1\n"
-	"echo Display output file from CPU executed action -LOWER CASE expected-:"
-	" && cat /tmp/t3\n"
-	"\n"
-        "Example for a simulation\n"
-        "------------------------\n"
-        "snap_maint -vv\n"
-        "\n"
-        "echo clean possible temporary old files \n"
-	"rm /tmp/t2; rm /tmp/t3\n"
-	"echo Prepare the text to process\n"
-	"echo \"Hello world. This is my first CAPI SNAP experience. It's real fun\""
-	" > /tmp/t1\n"
-	"\n"
-	"echo Run the application + hardware action on the FPGA emulated on CPU\n"
-	"snap_helloworld -i /tmp/t1 -o /tmp/t2\n"
-	"echo Display input file: && cat /tmp/t1\n"
-	"echo Display output file from FPGA executed action -UPPER CASE expected-:"
-	" && cat /tmp/t2\n"
-	"\n"
-	"echo Run the application + software action on CPU\n"
-	"SNAP_CONFIG=CPU  snap_helloworld -i /tmp/t1 -o /tmp/t3\n"
-	"echo Display input file: && cat /tmp/t1\n"
-	"echo Display output file from CPU executed action -LOWER CASE expected-:"
-	" && cat /tmp/t3\n"
-	"\n",
-        prog);
-}
-
 // Function that fills the MMIO registers / data structure 
 // these are all data exchanged between the application and the action
-static void snap_prepare_helloworld(struct snap_job *cjob,
-				 struct rx100G_job *mjob,
-				 void *addr_out,
-				 uint32_t size_out,
-				 uint8_t type_out)
+static void snap_prepare_rx100G(struct snap_job *cjob,
+				 struct rx100G_job *mjob,                               
+				 void *addr_out_data,
+				 uint32_t size_out_data,
+				 uint8_t type_out_data,
+				 void *addr_out_last,
+				 uint32_t size_out_last,
+				 uint8_t type_out_last)
 {
-	fprintf(stderr, "  prepare helloworld job of %ld bytes size\n", sizeof(*mjob));
+	fprintf(stderr, "  prepare rx100G job of %ld bytes size\n", sizeof(*mjob));
 
 	assert(sizeof(*mjob) <= SNAP_JOBSIZE);
 	memset(mjob, 0, sizeof(*mjob));
 
 	// Setting output params : where result will be written in host memory
-	snap_addr_set(&mjob->out, addr_out, size_out, type_out,
+	snap_addr_set(&mjob->out_data, addr_out_data, size_out_data, type_out_data,
+		      SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
+		      SNAP_ADDRFLAG_END);
+
+	// Setting output params : where result will be written in host memory
+	snap_addr_set(&mjob->out_last, addr_out_last, size_out_last, type_out_last,
 		      SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
 		      SNAP_ADDRFLAG_END);
 
@@ -147,41 +76,46 @@ static void snap_prepare_helloworld(struct snap_job *cjob,
 /* main program of the application for the hls_helloworld example        */
 /* This application will always be run on CPU and will call either       */
 /* a software action (CPU executed) or a hardware action (FPGA executed) */
-int main(int argc, char *argv[])
+int main()
 {
 	// Init of all the default values used 
         int num_packets = 100;
-	int ch, rc = 0;
+	int rc = 0;
 	int card_no = 0;
 	struct snap_card *card = NULL;
 	struct snap_action *action = NULL;
 	char device[128];
 	struct snap_job cjob;
-	struct helloworld_job mjob;
+	struct rx100G_job mjob;
 	const char *output = NULL;
 	unsigned long timeout = 600;
-	const char *space = "CARD_RAM";
 	struct timeval etime, stime;
 	ssize_t size = 1024 * 1024;
-	uint8_t *ibuff = NULL, *obuff = NULL;
+	uint8_t *obuff_data = NULL, *obuff_last = NULL;
 	uint8_t type_out = SNAP_ADDRTYPE_HOST_DRAM;
-	uint64_t addr_out = 0x0ull;
-	int verify = 0;
+
+	uint64_t addr_out_data = 0x0ull;
+	uint64_t addr_out_last = 0x0ull;
+
 	int exit_code = EXIT_SUCCESS;
-	uint8_t trailing_zeros[1024] = { 0, };
+
 	// default is interrupt mode enabled (vs polling)
 	snap_action_flag_t action_irq = (SNAP_ACTION_DONE_IRQ | SNAP_ATTACH_IRQ);
 
 	/* Allocate in host memory the place to put the text processed */
         size_t set_size = 9600 * num_packets;
-	obuff = snap_malloc(set_size); //64Bytes aligned malloc
-	if (obuff == NULL)
-		goto out_error;
-	memset(obuff, 0x0, set_size);
+	obuff_data = snap_malloc(set_size); //64Bytes aligned malloc
+	if (obuff_data == NULL) goto out_error;
+	memset(obuff_data, 0x0, set_size);
+
+	obuff_last = snap_malloc(set_size); //64Bytes aligned malloc
+	if (obuff_last == NULL) goto out_error;
+	memset(obuff_last, 0x0, set_size);
 
 	// prepare params to be written in MMIO registers for action
 	type_out = SNAP_ADDRTYPE_HOST_DRAM;
-	addr_out = (unsigned long)obuff;
+	addr_out_data = (unsigned long)obuff_data;
+	addr_out_last = (unsigned long)obuff_last;
 
 	/* Display the parameters that will be used for the example */
 	printf("PARAMETERS:\n"
@@ -190,7 +124,7 @@ int main(int argc, char *argv[])
 	       "  addr_out:    %016llx\n"
 	       "  size_in/out: %08lx\n",
 	       output ? output : "unknown",	       
-	       type_out, mem_tab[type_out], (long long)addr_out,
+	       type_out, mem_tab[type_out], (long long)addr_out_data,
 	       set_size);
 
 
@@ -214,8 +148,8 @@ int main(int argc, char *argv[])
 
 	// Fill the stucture of data exchanged with the action
 	snap_prepare_rx100G(&cjob, &mjob,
-			     (void *)addr_in,  size, type_in,
-			     (void *)addr_out, size, type_out);
+			     (void *)addr_out_data, size, type_out,
+			     (void *)addr_out_last, size, type_out);
 
 	// uncomment to dump the job structure
 	//__hexdump(stderr, &mjob, sizeof(mjob));
@@ -242,9 +176,9 @@ int main(int argc, char *argv[])
 	/* If the output buffer is in host DRAM we can write it to a file */
 	if (output != NULL) {
 		fprintf(stdout, "writing output data %p %d bytes to %s\n",
-			obuff, (int)size, output);
+			obuff_data, (int)size, output);
 
-		rc = __file_write(output, obuff, size);
+		rc = __file_write(output, obuff_data, size);
 		if (rc < 0)
 			goto out_error2;
 	}
@@ -264,7 +198,8 @@ int main(int argc, char *argv[])
 	snap_detach_action(action);
 	snap_card_free(card);
 
-	__free(obuff);
+	__free(obuff_data);
+	__free(obuff_last);
 	exit(exit_code);
 
  out_error2:
@@ -272,6 +207,7 @@ int main(int argc, char *argv[])
  out_error1:
 	snap_card_free(card);
  out_error:
-	__free(obuff);
+	__free(obuff_data);
+	__free(obuff_last);
 	exit(EXIT_FAILURE);
 }

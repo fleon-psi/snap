@@ -1,5 +1,5 @@
-#ifndef __ACTION_UPPERCASE_H__
-#define __ACTION_UPPERCASE_H__
+#ifndef __ACTION_RX100G_H__
+#define __ACTION_RX100G_H__
 
 /*
  * Copyright 2017 International Business Machines
@@ -23,7 +23,7 @@
 #include <hls_stream.h>
 
 #include "hls_snap.H"
-#include <action_changecase.h> /* HelloWorld Job definition */
+#include "../include/action_rx100G.h" /* HelloWorld Job definition */
 
 //--------------------------------------------------------------------
 // 1: simplify the data casting style
@@ -50,4 +50,4 @@ typedef struct {
 
 typedef hls::stream<ap_axiu_for_eth> AXI_STREAM;
 
-#endif  /* __ACTION_UPPERCASE_H__*/
+#endif  /* __ACTION_RX100G_H__*/

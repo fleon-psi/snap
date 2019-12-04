@@ -37,9 +37,9 @@ endif
 endif
 
 # This is solution specific. Check if we can replace this by generics too.
-SOLUTION_NAME ?= helloworld
-SOLUTION_DIR ?= hlsUpperCase
-srcs += action_uppercase.cpp 
+SOLUTION_NAME ?= rx100G
+SOLUTION_DIR ?= hlsRX100G
+srcs += hw_action_rx100G.cpp 
 
 # If you have the action code outside of the default snap directory structure, 
 # change to /path/to/snap/actions/hls.mk

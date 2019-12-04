@@ -29,10 +29,11 @@ extern "C" {
 /* Data structure used to exchange information between action and application */
 /* Size limit is 108 Bytes */
 typedef struct rx100G_job {
-        unisigned char fpga_macaddr[6];
-        size_t read_packets;
-        size_t read_size;
-	struct snap_addr out;   /* offset table */       
+    unsigned char fpga_macaddr[6];
+    size_t read_packets;
+    size_t read_size;
+	struct snap_addr out_data;
+	struct snap_addr out_last;
 } rx100G_job_t;
 
 #ifdef __cplusplus

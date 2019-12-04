@@ -38,10 +38,10 @@ endif
 
 # This is solution specific. Check if we can replace this by generics too.
 
-#snap_helloworld: action_lowercase.o
+snap_helloworld: snap_rx100G.o
 #snap_helloworld_objs = action_lowercase.o
 
-#projs += snap_helloworld
+projs += snap_rx100G
 
 # If you have the host code outside of the default snap directory structure, 
 # change to /path/to/snap/actions/software.mk
