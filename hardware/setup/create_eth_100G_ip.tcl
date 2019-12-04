@@ -17,7 +17,7 @@ update_ip_catalog -rebuild -scan_changes
   set i_gt_ref [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 i_gt_ref ]
   set_property -dict [ list \
    CONFIG.FREQ_HZ {161132812} \
- ] $i_gt_ref
+   ] $i_gt_ref
 
   set i_gt_rx [ create_bd_intf_port -mode Slave -vlnv xilinx.com:display_cmac_usplus:gt_ports:2.0 i_gt_rx ]
 
@@ -38,11 +38,9 @@ update_ip_catalog -rebuild -scan_changes
    CONFIG.TUSER_WIDTH {1} \
    ] $s_axis_eth1
 
+
   # Create ports
-  set i_capi_clk [ create_bd_port -dir I -type clk i_capi_clk ]
-  set_property -dict [ list \
-   CONFIG.FREQ_HZ {250000000} \
- ] $i_capi_clk
+  set i_capi_clk [ create_bd_port -dir I -type clk -freq_hz 250000000 i_capi_clk ]
   set i_core_rx_reset [ create_bd_port -dir I -type rst i_core_rx_reset ]
   set_property -dict [ list \
    CONFIG.POLARITY {ACTIVE_HIGH} \
@@ -53,12 +51,12 @@ update_ip_catalog -rebuild -scan_changes
  ] $i_core_tx_reset
   set i_ctl_rx_enable [ create_bd_port -dir I i_ctl_rx_enable ]
   set i_ctl_rx_rsfec_enable [ create_bd_port -dir I i_ctl_rx_rsfec_enable ]
+  set i_ctl_tx_enable [ create_bd_port -dir I i_ctl_tx_enable ]
+  set i_ctl_tx_rsfec_enable [ create_bd_port -dir I i_ctl_tx_rsfec_enable ]
   set i_sys_reset [ create_bd_port -dir I -type rst i_sys_reset ]
   set_property -dict [ list \
    CONFIG.POLARITY {ACTIVE_HIGH} \
  ] $i_sys_reset
-  set i_ctl_tx_enable [ create_bd_port -dir I i_ctl_tx_enable ]
-  set i_ctl_tx_rsfec_enable [ create_bd_port -dir I i_ctl_tx_rsfec_enable ]
 
   # Create instance: axis_clock_converter_0, and set properties
   set axis_clock_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_0 ]
@@ -68,7 +66,6 @@ update_ip_catalog -rebuild -scan_changes
 
   # Create instance: cmac_usplus_0, and set properties
   set cmac_usplus_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:cmac_usplus:3.0 cmac_usplus_0 ]
-#  set cmac_usplus_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:cmac_usplus:2.6 cmac_usplus_0 ]
   set_property -dict [ list \
    CONFIG.CMAC_CAUI4_MODE {1} \
    CONFIG.GT_DRP_CLK {250.00} \
@@ -90,7 +87,6 @@ update_ip_catalog -rebuild -scan_changes
    CONFIG.TX_FLOW_CONTROL {0} \
    CONFIG.USER_INTERFACE {AXIS} \
  ] $cmac_usplus_0
-#   CONFIG.NUM_LANES {4} \
 
   # Create instance: util_vector_logic_0, and set properties
   set util_vector_logic_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 util_vector_logic_0 ]
@@ -100,9 +96,12 @@ update_ip_catalog -rebuild -scan_changes
    CONFIG.LOGO_FILE {data/sym_notgate.png} \
  ] $util_vector_logic_0
 
+  # Create instance: xlconstant_0, and set properties
+  set xlconstant_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_0 ]
+
   # Create interface connections
-  connect_bd_intf_net -intf_net axis_clock_converter [get_bd_intf_pins axis_clock_converter_0/S_AXIS] [get_bd_intf_pins axis_clock_converter_1/M_AXIS]
   connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins cmac_usplus_0/axis_tx]
+  connect_bd_intf_net -intf_net axis_clock_converter_1_M_AXIS [get_bd_intf_pins axis_clock_converter_0/S_AXIS] [get_bd_intf_pins axis_clock_converter_1/M_AXIS]
   connect_bd_intf_net -intf_net cmac_usplus_0_axis_rx [get_bd_intf_pins axis_clock_converter_1/S_AXIS] [get_bd_intf_pins cmac_usplus_0/axis_rx]
   connect_bd_intf_net -intf_net cmac_usplus_0_gt_tx [get_bd_intf_ports o_gt_tx] [get_bd_intf_pins cmac_usplus_0/gt_tx]
   connect_bd_intf_net -intf_net i_gt_ref_1 [get_bd_intf_ports i_gt_ref] [get_bd_intf_pins cmac_usplus_0/gt_ref_clk]
@@ -118,7 +117,8 @@ update_ip_catalog -rebuild -scan_changes
   connect_bd_net -net i_ctl_rx_rsfec_enable_1 [get_bd_ports i_ctl_rx_rsfec_enable] [get_bd_pins cmac_usplus_0/ctl_rx_rsfec_enable]
   connect_bd_net -net i_ctl_tx_rsfec_enable_1 [get_bd_ports i_ctl_tx_rsfec_enable] [get_bd_pins cmac_usplus_0/ctl_tx_rsfec_enable]
   connect_bd_net -net i_sys_reset_1 [get_bd_ports i_sys_reset] [get_bd_pins cmac_usplus_0/sys_reset] [get_bd_pins util_vector_logic_0/Op1]
-  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins axis_clock_converter_0/m_axis_aresetn] [get_bd_pins axis_clock_converter_0/s_axis_aresetn] [get_bd_pins axis_clock_converter_1/m_axis_aresetn] [get_bd_pins axis_clock_converter_1/s_axis_aresetn] [get_bd_pins util_vector_logic_0/Res]
+  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins axis_clock_converter_0/s_axis_aresetn] [get_bd_pins axis_clock_converter_1/m_axis_aresetn] [get_bd_pins util_vector_logic_0/Res]
+  connect_bd_net -net xlconstant_0_dout [get_bd_pins axis_clock_converter_0/m_axis_aresetn] [get_bd_pins axis_clock_converter_1/s_axis_aresetn] [get_bd_pins xlconstant_0/dout]
 
 assign_bd_address
 validate_bd_design
