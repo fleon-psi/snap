@@ -24,6 +24,7 @@
 static int process_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
+		AXI_STREAM &dout_eth,
 		action_reg *act_reg)
 {
 	uint64_t o_idx_data;
@@ -31,22 +32,19 @@ static int process_action(snap_membus_t *din_gmem,
 	uint64_t o_idx_last;
 	o_idx_last = act_reg->Data.out_last.addr >> ADDR_RIGHT_SHIFT;
 
+	ap_axiu_for_eth packet_in;
 
-	ap_uint<512> last;
-	for (int i = 0; i < 1024; i++) {
-#pragma HLS PIPELINE enable_flush
-		ap_axiu_for_eth packet_in;
-		din_eth.read(packet_in);
-		memcpy(dout_gmem + o_idx_data, &(packet_in.data), BPERDW);
-		last[o_idx_data % 512] = packet_in.last;
-		//if (o_idx_data % 512 == 511) {
-		//	memcpy(dout_gmem + o_idx_last, &last, BPERDW);
-		//	last = 0;
-		//	o_idx_last++;
-		//}
-		o_idx_data++;
-	}
-	act_reg->Data.read_size = o_idx_data * 64;
+        for (int i = 0; i < 5; i++) {
+           do {
+              #pragma HLS PIPELINE enable_flush
+	      din_eth.read(packet_in);
+              ap_uint<512> tmp = packet_in.data;
+              memcpy(dout_gmem + o_idx_data, &tmp, 64);
+              o_idx_data++;
+	      dout_eth.write(packet_in);
+           } while (packet_in.last == 0);
+        }
+//	act_reg->Data.read_size = o_idx_data * 64;
 
 	act_reg->Control.Retc = SNAP_RETC_SUCCESS;
 	return 0;
@@ -56,6 +54,7 @@ static int process_action(snap_membus_t *din_gmem,
 void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
+		AXI_STREAM &dout_eth,
 		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
 		action_RO_config_reg *Action_Config)
@@ -81,7 +80,8 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE s_axilite port=act_reg bundle=ctrl_reg offset=0x100
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
-#pragma HLS INTERFACE axis  port=din_eth1
+#pragma HLS INTERFACE axis register off port=din_eth
+#pragma HLS INTERFACE axis register off port=dout_eth
 
 	/* Required Action Type Detection - NO CHANGE BELOW */
 	//	NOTE: switch generates better vhdl than "if" */
@@ -96,7 +96,7 @@ void hls_action(snap_membus_t *din_gmem,
 		break;
 	default:
 		/* process_action(din_gmem, dout_gmem, d_ddrmem, act_reg); */
-		process_action(din_gmem, dout_gmem, din_eth, act_reg);
+		process_action(din_gmem, dout_gmem, din_eth, dout_eth, act_reg);
 		break;
 	}
 }
