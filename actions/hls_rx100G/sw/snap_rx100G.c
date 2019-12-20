@@ -14,13 +14,6 @@
  * limitations under the License.
  */
 
-/**
- * SNAP HelloWorld Example
- *
- * Demonstration how to get data into the FPGA, process it using a SNAP
- * action and move the data out of the FPGA back to host-DRAM.
- */
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,7 +31,7 @@
 #include <action_rx100G.h>
 #include <snap_hls_if.h>
 
-int verbose_flag = 0;
+//int verbose_flag = 0;
 
 //static const char *version = GIT_VERSION;
 
@@ -48,12 +41,9 @@ static const char *mem_tab[] = { "HOST_DRAM", "CARD_DRAM", "TYPE_NVME" };
 // these are all data exchanged between the application and the action
 static void snap_prepare_rx100G(struct snap_job *cjob,
 				 struct rx100G_job *mjob,                               
-				 void *addr_out_data,
-				 uint32_t size_out_data,
-				 uint8_t type_out_data,
-				 void *addr_out_last,
-				 uint32_t size_out_last,
-				 uint8_t type_out_last)
+				 void *addr_out,
+				 uint32_t size_out,
+				 uint8_t type_out)
 {
 	fprintf(stderr, "  prepare rx100G job of %ld bytes size\n", sizeof(*mjob));
 
@@ -61,12 +51,7 @@ static void snap_prepare_rx100G(struct snap_job *cjob,
 	memset(mjob, 0, sizeof(*mjob));
 
 	// Setting output params : where result will be written in host memory
-	snap_addr_set(&mjob->out_data, addr_out_data, size_out_data, type_out_data,
-		      SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
-		      SNAP_ADDRFLAG_END);
-
-	// Setting output params : where result will be written in host memory
-	snap_addr_set(&mjob->out_last, addr_out_last, size_out_last, type_out_last,
+	snap_addr_set(&mjob->out, addr_out, size_out, type_out,
 		      SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
 		      SNAP_ADDRFLAG_END);
 
@@ -79,23 +64,20 @@ static void snap_prepare_rx100G(struct snap_job *cjob,
 int main()
 {
 	// Init of all the default values used 
-        int num_packets = 100;
 	int rc = 0;
-	int card_no = 0;
+	int card_no = 1;
 	struct snap_card *card = NULL;
 	struct snap_action *action = NULL;
 	char device[128];
 	struct snap_job cjob;
 	struct rx100G_job mjob;
-	const char *output = NULL;
 	unsigned long timeout = 600;
 	struct timeval etime, stime;
-	ssize_t size = 1024 * 1024;
-	uint8_t *obuff_data = NULL, *obuff_last = NULL;
+	ssize_t size = 1024 * 64;
+	uint8_t *obuff = NULL;
 	uint8_t type_out = SNAP_ADDRTYPE_HOST_DRAM;
 
-	uint64_t addr_out_data = 0x0ull;
-	uint64_t addr_out_last = 0x0ull;
+	uint64_t addr_out = 0x0ull;
 
 	int exit_code = EXIT_SUCCESS;
 
@@ -103,29 +85,21 @@ int main()
 	snap_action_flag_t action_irq = (SNAP_ACTION_DONE_IRQ | SNAP_ATTACH_IRQ);
 
 	/* Allocate in host memory the place to put the text processed */
-        size_t set_size = 9600 * num_packets;
-	obuff_data = snap_malloc(set_size); //64Bytes aligned malloc
-	if (obuff_data == NULL) goto out_error;
-	memset(obuff_data, 0x0, set_size);
-
-	obuff_last = snap_malloc(set_size); //64Bytes aligned malloc
-	if (obuff_last == NULL) goto out_error;
-	memset(obuff_last, 0x0, set_size);
+	obuff = snap_malloc(size); //64Bytes aligned malloc
+	if (obuff == NULL) goto out_error;
+	memset(obuff, 0x0, size);
 
 	// prepare params to be written in MMIO registers for action
 	type_out = SNAP_ADDRTYPE_HOST_DRAM;
-	addr_out_data = (unsigned long)obuff_data;
-	addr_out_last = (unsigned long)obuff_last;
+	addr_out = (unsigned long)obuff;
 
 	/* Display the parameters that will be used for the example */
 	printf("PARAMETERS:\n"
-	       "  output:      %s\n"
 	       "  type_out:    %x %s\n"
 	       "  addr_out:    %016llx\n"
 	       "  size_in/out: %08lx\n",
-	       output ? output : "unknown",	       
-	       type_out, mem_tab[type_out], (long long)addr_out_data,
-	       set_size);
+	       type_out, mem_tab[type_out], (long long)addr_out,
+	       size);
 
 
 	// Allocate the card that will be used
@@ -148,11 +122,10 @@ int main()
 
 	// Fill the stucture of data exchanged with the action
 	snap_prepare_rx100G(&cjob, &mjob,
-			     (void *)addr_out_data, size, type_out,
-			     (void *)addr_out_last, size, type_out);
+			     (void *)addr_out, size, type_out);
 
 	// uncomment to dump the job structure
-	//__hexdump(stderr, &mjob, sizeof(mjob));
+	__hexdump(stderr, &mjob, sizeof(mjob));
 
 
 	// Collect the timestamp BEFORE the call of the action
@@ -172,16 +145,7 @@ int main()
 			strerror(errno));
 		goto out_error2;
 	}
-
-	/* If the output buffer is in host DRAM we can write it to a file */
-	if (output != NULL) {
-		fprintf(stdout, "writing output data %p %d bytes to %s\n",
-			obuff_data, (int)size, output);
-
-		rc = __file_write(output, obuff_data, size);
-		if (rc < 0)
-			goto out_error2;
-	}
+        __hexdump(stderr, obuff, size);
 
 	// test return code
 	(cjob.retc == SNAP_RETC_SUCCESS) ? fprintf(stdout, "SUCCESS\n") : fprintf(stdout, "FAILED\n");
@@ -198,8 +162,7 @@ int main()
 	snap_detach_action(action);
 	snap_card_free(card);
 
-	__free(obuff_data);
-	__free(obuff_last);
+	__free(obuff);
 	exit(exit_code);
 
  out_error2:
@@ -207,7 +170,6 @@ int main()
  out_error1:
 	snap_card_free(card);
  out_error:
-	__free(obuff_data);
-	__free(obuff_last);
+	__free(obuff);
 	exit(EXIT_FAILURE);
 }

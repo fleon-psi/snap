@@ -18,6 +18,7 @@
 #include "ap_int.h"
 #include "hw_action_rx100G.h"
 
+
 //----------------------------------------------------------------------
 //--- MAIN PROGRAM -----------------------------------------------------
 //----------------------------------------------------------------------
@@ -27,24 +28,22 @@ static int process_action(snap_membus_t *din_gmem,
 		AXI_STREAM &dout_eth,
 		action_reg *act_reg)
 {
-	uint64_t o_idx_data;
-	o_idx_data = act_reg->Data.out_data.addr >> ADDR_RIGHT_SHIFT;
-	uint64_t o_idx_last;
-	o_idx_last = act_reg->Data.out_last.addr >> ADDR_RIGHT_SHIFT;
+	uint64_t o_idx;
+	o_idx = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
 
 	ap_axiu_for_eth packet_in;
 
+        word_t text;
         for (int i = 0; i < 5; i++) {
            do {
-              #pragma HLS PIPELINE enable_flush
 	      din_eth.read(packet_in);
-              ap_uint<512> tmp = packet_in.data;
-              memcpy(dout_gmem + o_idx_data, &tmp, 64);
-              o_idx_data++;
+              memcpy(dout_gmem + o_idx, (char *) (&packet_in.data), BPERDW);
+              o_idx++;
 	      dout_eth.write(packet_in);
            } while (packet_in.last == 0);
+	   o_idx++;
         }
-//	act_reg->Data.read_size = o_idx_data * 64;
+	act_reg->Data.read_size = o_idx * 64;
 
 	act_reg->Control.Retc = SNAP_RETC_SUCCESS;
 	return 0;
