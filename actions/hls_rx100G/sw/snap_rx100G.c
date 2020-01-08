@@ -31,6 +31,8 @@
 #include <action_rx100G.h>
 #include <snap_hls_if.h>
 
+#define NPACKETS 1
+
 //int verbose_flag = 0;
 
 //static const char *version = GIT_VERSION;
@@ -55,6 +57,8 @@ static void snap_prepare_rx100G(struct snap_job *cjob,
 		      SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
 		      SNAP_ADDRFLAG_END);
 
+	mjob->packets_to_read = NPACKETS;
+
 	snap_job_set(cjob, mjob, sizeof(*mjob), NULL, 0);
 }
 
@@ -73,7 +77,7 @@ int main()
 	struct rx100G_job mjob;
 	unsigned long timeout = 600;
 	struct timeval etime, stime;
-	ssize_t size = 1024 * 64;
+	ssize_t size = NPACKETS * 20 * 64;
 	uint8_t *obuff = NULL;
 	uint8_t type_out = SNAP_ADDRTYPE_HOST_DRAM;
 
@@ -119,7 +123,7 @@ int main()
 			card_no, strerror(errno));
 		goto out_error1;
 	}
-
+ 
 	// Fill the stucture of data exchanged with the action
 	snap_prepare_rx100G(&cjob, &mjob,
 			     (void *)addr_out, size, type_out);
@@ -145,7 +149,11 @@ int main()
 			strerror(errno));
 		goto out_error2;
 	}
-        __hexdump(stderr, obuff, size);
+        __hexdump(stdout, obuff, size);
+	printf(" Loaded bytes %ld\n", mjob.read_size);
+	printf(" Ether type %lx\n", mjob.ether_type);
+	printf(" Protocol %lx\n", mjob.protocol);
+	printf(" Version %lx\n", mjob.version);
 
 	// test return code
 	(cjob.retc == SNAP_RETC_SUCCESS) ? fprintf(stdout, "SUCCESS\n") : fprintf(stdout, "FAILED\n");

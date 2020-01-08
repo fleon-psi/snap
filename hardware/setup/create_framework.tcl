@@ -241,13 +241,15 @@ if { $eth_used == TRUE } {
 
   launch_runs eth_100G_cmac_usplus_0_0_synth_1 >> $log_file
   launch_runs eth_100G_axis_clock_converter_rx_0_0_synth_1 >> $log_file
-  launch_runs eth_100G_axis_clock_converter_tx_0_0_synth_1 >> $log_file
   launch_runs eth_100G_util_vector_logic_0_0_synth_1 >> $log_file
 
   wait_on_run eth_100G_cmac_usplus_0_0_synth_1 >> $log_file
   wait_on_run eth_100G_axis_clock_converter_rx_0_0_synth_1 >> $log_file
-  wait_on_run eth_100G_axis_clock_converter_tx_0_0_synth_1 >> $log_file
   wait_on_run eth_100G_util_vector_logic_0_0_synth_1 >> $log_file
+
+# Enable for ethernet TX
+#  launch_runs eth_100G_axis_clock_converter_tx_0_0_synth_1 >> $log_file
+#  wait_on_run eth_100G_axis_clock_converter_tx_0_0_synth_1 >> $log_file
 
 }
 

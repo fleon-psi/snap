@@ -48,6 +48,41 @@ typedef struct {
     ap_uint<1>       last;
   };
 
+  struct packet_header_t {
+  	ap_uint<48> dest_mac ;
+  	ap_uint<48> src_mac  ;
+  	ap_uint<16> ether_type ;
+
+  	ap_uint<4> ip_version ;
+  	ap_uint<4> ipv4_header_len ;
+  	ap_uint<8>  ipv4_protocol  ;
+  	ap_uint<16> ipv4_total_len ;
+  	ap_uint<32> ipv4_header_checksum;
+  	ap_uint<32> ipv4_source_ip ;
+  	ap_uint<32> ipv4_dest_ip ;
+
+  	ap_uint<16> udp_src_port;
+  	ap_uint<16> udp_dest_port;
+  	ap_uint<16> udp_len;
+  	ap_uint<16> udp_checksum;
+
+  //	ap_uint<64> jf_frame_number;
+  //	ap_uint<32> jf_exptime;
+  //	ap_uint<32> jf_packet_number;
+  //	ap_uint<64> jf_bunch_id;
+  //	ap_uint<64> jf_timestamp;
+  // 	ap_uint<16> jf_module_id;
+  //	ap_uint<16> jf_xcoord;
+  //	ap_uint<16> jf_ycoord;
+  //	ap_uint<16> jf_zcoord;
+  //	ap_uint<32> jf_debug;
+  //	ap_uint<16> jf_round_robin;
+  //	ap_uint<8> jf_detector_type;
+  //	ap_uint<8> jf_header_version_type;
+  };
+
+  void decode_eth_1(ap_uint<512> val_in, packet_header_t &header_out) ;
+
 typedef hls::stream<ap_axiu_for_eth> AXI_STREAM;
 
 #endif  /* __ACTION_RX100G_H__*/

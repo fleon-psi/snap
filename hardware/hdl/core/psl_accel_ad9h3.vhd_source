@@ -238,14 +238,6 @@ ENTITY psl_accel IS
     gt_rx_gt_port_2_p                   : IN STD_LOGIC;
     gt_rx_gt_port_3_n                   : IN STD_LOGIC;
     gt_rx_gt_port_3_p                   : IN STD_LOGIC;
---    gt_rx_gt_port_4_n                   : IN STD_LOGIC;
---    gt_rx_gt_port_4_p                   : IN STD_LOGIC;
---    gt_rx_gt_port_5_n                   : IN STD_LOGIC;
---    gt_rx_gt_port_5_p                   : IN STD_LOGIC;
---    gt_rx_gt_port_6_n                   : IN STD_LOGIC;
---    gt_rx_gt_port_6_p                   : IN STD_LOGIC;
---    gt_rx_gt_port_7_n                   : IN STD_LOGIC;
---    gt_rx_gt_port_7_p                   : IN STD_LOGIC;
     gt_tx_gt_port_0_n                   : OUT STD_LOGIC;
     gt_tx_gt_port_0_p                   : OUT STD_LOGIC;
     gt_tx_gt_port_1_n                   : OUT STD_LOGIC;
@@ -254,14 +246,6 @@ ENTITY psl_accel IS
     gt_tx_gt_port_2_p                   : OUT STD_LOGIC;
     gt_tx_gt_port_3_n                   : OUT STD_LOGIC;
     gt_tx_gt_port_3_p                   : OUT STD_LOGIC;
---    gt_tx_gt_port_4_n                   : OUT STD_LOGIC;
---    gt_tx_gt_port_4_p                   : OUT STD_LOGIC;
---    gt_tx_gt_port_5_n                   : OUT STD_LOGIC;
---    gt_tx_gt_port_5_p                   : OUT STD_LOGIC;
---    gt_tx_gt_port_6_n                   : OUT STD_LOGIC;
---    gt_tx_gt_port_6_p                   : OUT STD_LOGIC;
---    gt_tx_gt_port_7_n                   : OUT STD_LOGIC;
---    gt_tx_gt_port_7_p                   : OUT STD_LOGIC;
 #endif
     -- Parity Enable output and 250MHz Clock input
     ah_tbreq                            : OUT std_logic ;                       -- Timebase command request
@@ -498,13 +482,13 @@ ARCHITECTURE psl_accel OF psl_accel IS
     din_eth_TKEEP            : IN STD_LOGIC_VECTOR (63 downto 0);
     din_eth_TUSER            : IN STD_LOGIC_VECTOR (0 downto 0);
     din_eth_TLAST            : IN STD_LOGIC;
-
-    dout_eth_TDATA           : OUT STD_LOGIC_VECTOR (511 downto 0);
-    dout_eth_TVALID          : OUT STD_LOGIC;
-    dout_eth_TREADY          : IN STD_LOGIC;
-    dout_eth_TKEEP           : OUT STD_LOGIC_VECTOR (63 downto 0);
-    dout_eth_TUSER           : OUT STD_LOGIC_VECTOR (0 downto 0);
-    dout_eth_TLAST           : OUT STD_LOGIC;
+-- Enable for ethernet TX
+--    dout_eth_TDATA           : OUT STD_LOGIC_VECTOR (511 downto 0);
+--    dout_eth_TVALID          : OUT STD_LOGIC;
+--    dout_eth_TREADY          : IN STD_LOGIC;
+--    dout_eth_TKEEP           : OUT STD_LOGIC_VECTOR (63 downto 0);
+--    dout_eth_TUSER           : OUT STD_LOGIC_VECTOR (0 downto 0);
+--    dout_eth_TLAST           : OUT STD_LOGIC;
 #endif
 
       --
@@ -836,19 +820,20 @@ ARCHITECTURE psl_accel OF psl_accel IS
     i_gt_ref_clk_n : in STD_LOGIC;
     i_gt_ref_clk_p : in STD_LOGIC;
 
+-- Enable for ethernet TX
+--    s_axis_tx_tdata : in STD_LOGIC_VECTOR ( 511 downto 0 );
+--    s_axis_tx_tkeep : in STD_LOGIC_VECTOR ( 63 downto 0 );
+--    s_axis_tx_tlast : in STD_LOGIC;
+--    s_axis_tx_tready : out STD_LOGIC;
+--    s_axis_tx_tuser : in STD_LOGIC_VECTOR ( 0 to 0 );
+--    s_axis_tx_tvalid : in STD_LOGIC;
+
     m_axis_rx_tdata : out STD_LOGIC_VECTOR ( 511 downto 0 );
     m_axis_rx_tkeep : out STD_LOGIC_VECTOR ( 63 downto 0 );
     m_axis_rx_tlast : out STD_LOGIC;
     m_axis_rx_tready : in STD_LOGIC;
     m_axis_rx_tuser : out STD_LOGIC_VECTOR ( 0 to 0 );
-    m_axis_rx_tvalid : out STD_LOGIC;
-
-    s_axis_tx_tdata : in STD_LOGIC_VECTOR ( 511 downto 0 );
-    s_axis_tx_tkeep : in STD_LOGIC_VECTOR ( 63 downto 0 );
-    s_axis_tx_tlast : in STD_LOGIC;
-    s_axis_tx_tready : out STD_LOGIC;
-    s_axis_tx_tuser : in STD_LOGIC_VECTOR ( 0 to 0 );
-    s_axis_tx_tvalid : in STD_LOGIC
+    m_axis_rx_tvalid : out STD_LOGIC
     );
     END COMPONENT;
 
@@ -1386,12 +1371,13 @@ ARCHITECTURE psl_accel OF psl_accel IS
     SIGNAL eth1_rx_tready               : STD_LOGIC;
     SIGNAL eth1_rx_tuser                : STD_LOGIC_VECTOR(0 DOWNTO 0);
 
-    SIGNAL eth1_tx_tdata                : STD_LOGIC_VECTOR(511 DOWNTO 0);
-    SIGNAL eth1_tx_tkeep                : STD_LOGIC_VECTOR(63 DOWNTO 0);
-    SIGNAL eth1_tx_tlast                : STD_LOGIC;
-    SIGNAL eth1_tx_tvalid               : STD_LOGIC;
-    SIGNAL eth1_tx_tready               : STD_LOGIC;
-    SIGNAL eth1_tx_tuser                : STD_LOGIC_VECTOR(0 DOWNTO 0);
+-- Enable for ethernet TX
+--    SIGNAL eth1_tx_tdata                : STD_LOGIC_VECTOR(511 DOWNTO 0);
+--    SIGNAL eth1_tx_tkeep                : STD_LOGIC_VECTOR(63 DOWNTO 0);
+--    SIGNAL eth1_tx_tlast                : STD_LOGIC;
+--    SIGNAL eth1_tx_tvalid               : STD_LOGIC;
+--    SIGNAL eth1_tx_tready               : STD_LOGIC;
+--    SIGNAL eth1_tx_tuser                : STD_LOGIC_VECTOR(0 DOWNTO 0);
 
     SIGNAL eth_rst                      : STD_LOGIC;
 --    SIGNAL eth_rx_enable                : STD_LOGIC;
@@ -1665,12 +1651,13 @@ BEGIN
     din_eth_TUSER                    => eth1_rx_tuser,
     din_eth_TLAST                    => eth1_rx_tlast,
 
-    dout_eth_TDATA                   => eth1_tx_tdata,
-    dout_eth_TVALID                  => eth1_tx_tvalid,
-    dout_eth_TREADY                  => eth1_tx_tready,
-    dout_eth_TKEEP                   => eth1_tx_tkeep,
-    dout_eth_TUSER                   => eth1_tx_tuser,
-    dout_eth_TLAST                   => eth1_tx_tlast,
+-- Enable for ethernet TX
+--    dout_eth_TDATA                   => eth1_tx_tdata,
+--    dout_eth_TVALID                  => eth1_tx_tvalid,
+--    dout_eth_TREADY                  => eth1_tx_tready,
+--    dout_eth_TKEEP                   => eth1_tx_tkeep,
+--    dout_eth_TUSER                   => eth1_tx_tuser,
+--    dout_eth_TLAST                   => eth1_tx_tlast,
 #endif
       --
       -- AXI Control Register Interface
@@ -2321,14 +2308,15 @@ BEGIN
         m_axis_rx_tuser               => eth1_rx_tuser,
         m_axis_rx_tready              => eth1_rx_tready,
 
-        s_axis_tx_tdata               => eth1_tx_tdata,
-        s_axis_tx_tkeep               => eth1_tx_tkeep,
-        s_axis_tx_tlast               => eth1_tx_tlast,
-        s_axis_tx_tvalid              => eth1_tx_tvalid,
-        s_axis_tx_tuser               => eth1_tx_tuser,
-        s_axis_tx_tready              => eth1_tx_tready,
+-- Enable for ethernet TX
+--        s_axis_tx_tdata               => eth1_tx_tdata,
+--        s_axis_tx_tkeep               => eth1_tx_tkeep,
+--        s_axis_tx_tlast               => eth1_tx_tlast,
+--        s_axis_tx_tvalid              => eth1_tx_tvalid,
+--        s_axis_tx_tuser               => eth1_tx_tuser,
+--        s_axis_tx_tready              => eth1_tx_tready,
 
-        i_sys_reset                       => eth_rst,
+        i_sys_reset                     => eth_rst,
         i_core_rx_reset                 => eth_rst,
         i_core_tx_reset                 => eth_rst,
 	i_capi_clk	                => ha_pclock,

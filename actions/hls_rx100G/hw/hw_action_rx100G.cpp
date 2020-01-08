@@ -18,6 +18,7 @@
 #include "ap_int.h"
 #include "hw_action_rx100G.h"
 
+enum rcv_state_t {RCV_INIT, RCV_GOOD, RCV_IGNORE};
 
 //----------------------------------------------------------------------
 //--- MAIN PROGRAM -----------------------------------------------------
@@ -25,7 +26,7 @@
 static int process_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
-		AXI_STREAM &dout_eth,
+//		AXI_STREAM &dout_eth,
 		action_reg *act_reg)
 {
 	uint64_t o_idx;
@@ -33,17 +34,47 @@ static int process_action(snap_membus_t *din_gmem,
 
 	ap_axiu_for_eth packet_in;
 
-        word_t text;
-        for (int i = 0; i < 5; i++) {
-           do {
-	      din_eth.read(packet_in);
-              memcpy(dout_gmem + o_idx, (char *) (&packet_in.data), BPERDW);
-              o_idx++;
-	      dout_eth.write(packet_in);
-           } while (packet_in.last == 0);
-	   o_idx++;
-        }
-	act_reg->Data.read_size = o_idx * 64;
+	word_t text;
+
+	size_t packets_read = 0;
+	rcv_state_t rcv_state = RCV_INIT;
+	packet_header_t packet_header;
+
+	while (packets_read < act_reg->Data.packets_to_read) {
+#pragma HLS PIPELINE
+		din_eth.read(packet_in);
+		switch (rcv_state) {
+		case RCV_INIT:
+			decode_eth_1(packet_in.data, packet_header);
+			act_reg->Data.protocol = packet_header.ipv4_protocol;
+			act_reg->Data.ether_type = packet_header.ether_type;
+			act_reg->Data.version = packet_header.ip_version;
+			//if ((packet_header.ether_type == 0x0800) && // IP
+			//		(packet_header.ip_version == 4) && // IPv4
+			//		(packet_header.ipv4_protocol == 0x11)) // UDP
+			//{
+				rcv_state = RCV_GOOD;
+				memcpy(dout_gmem + o_idx, (char *) (&packet_in.data), BPERDW);
+				o_idx++;
+			//} else rcv_state = RCV_IGNORE;
+			break;
+		case RCV_IGNORE:
+			break;
+		case RCV_GOOD:
+			memcpy(dout_gmem + o_idx, (char *) (&packet_in.data), BPERDW);
+			o_idx++;
+			break;
+		}
+		if (packet_in.last == 1) {
+			if (rcv_state == RCV_GOOD) {
+				packets_read++;
+				o_idx++;
+			}
+			rcv_state = RCV_INIT;
+		}
+	}
+
+	act_reg->Data.read_size = (o_idx - 1) * 64;
 
 	act_reg->Control.Retc = SNAP_RETC_SUCCESS;
 	return 0;
@@ -53,7 +84,7 @@ static int process_action(snap_membus_t *din_gmem,
 void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
-		AXI_STREAM &dout_eth,
+//		AXI_STREAM &dout_eth,
 		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
 		action_RO_config_reg *Action_Config)
@@ -80,7 +111,7 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
 #pragma HLS INTERFACE axis register off port=din_eth
-#pragma HLS INTERFACE axis register off port=dout_eth
+// #pragma HLS INTERFACE axis register off port=dout_eth
 
 	/* Required Action Type Detection - NO CHANGE BELOW */
 	//	NOTE: switch generates better vhdl than "if" */
@@ -95,7 +126,8 @@ void hls_action(snap_membus_t *din_gmem,
 		break;
 	default:
 		/* process_action(din_gmem, dout_gmem, d_ddrmem, act_reg); */
-		process_action(din_gmem, dout_gmem, din_eth, dout_eth, act_reg);
+		// process_action(din_gmem, dout_gmem, din_eth, dout_eth, act_reg);
+		process_action(din_gmem, dout_gmem, din_eth, act_reg);
 		break;
 	}
 }
