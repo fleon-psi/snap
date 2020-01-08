@@ -38,7 +38,7 @@ endif
 
 # This is solution specific. Check if we can replace this by generics too.
 
-snap_helloworld: snap_rx100G.o
+snap_rx100G: snap_rx100G.o
 #snap_helloworld_objs = action_lowercase.o
 
 projs += snap_rx100G
