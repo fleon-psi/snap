@@ -77,7 +77,7 @@ int main()
 	struct rx100G_job mjob;
 	unsigned long timeout = 600;
 	struct timeval etime, stime;
-	ssize_t size = NPACKETS * 20 * 64;
+	ssize_t size = NPACKETS * 400 * 64;
 	uint8_t *obuff = NULL;
 	uint8_t type_out = SNAP_ADDRTYPE_HOST_DRAM;
 
@@ -150,10 +150,16 @@ int main()
 		goto out_error2;
 	}
         __hexdump(stdout, obuff, size);
+
+	__hexdump(stderr, &mjob, sizeof(mjob));
+
 	printf(" Loaded bytes %ld\n", mjob.read_size);
 	printf(" Ether type %lx\n", mjob.ether_type);
 	printf(" Protocol %lx\n", mjob.protocol);
 	printf(" Version %lx\n", mjob.version);
+	printf(" IP Header Length %lx\n", mjob.ipv4_header_len);
+	printf(" User %lx\n", mjob.user);
+	printf(" MAC %lx\n", mjob.fpga_mac_addr);
 
 	// test return code
 	(cjob.retc == SNAP_RETC_SUCCESS) ? fprintf(stdout, "SUCCESS\n") : fprintf(stdout, "FAILED\n");

@@ -29,8 +29,9 @@ static int process_action(snap_membus_t *din_gmem,
 //		AXI_STREAM &dout_eth,
 		action_reg *act_reg)
 {
-	uint64_t o_idx;
-	o_idx = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
+	uint64_t o_idx = 0;
+	uint64_t out_offset = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
+
 
 	ap_axiu_for_eth packet_in;
 
@@ -40,7 +41,8 @@ static int process_action(snap_membus_t *din_gmem,
 	rcv_state_t rcv_state = RCV_INIT;
 	packet_header_t packet_header;
 
-	while (packets_read < act_reg->Data.packets_to_read) {
+//	while (packets_read < act_reg->Data.packets_to_read) {
+	while (packets_read < 1) {
 #pragma HLS PIPELINE
 		din_eth.read(packet_in);
 		switch (rcv_state) {
@@ -49,19 +51,22 @@ static int process_action(snap_membus_t *din_gmem,
 			act_reg->Data.protocol = packet_header.ipv4_protocol;
 			act_reg->Data.ether_type = packet_header.ether_type;
 			act_reg->Data.version = packet_header.ip_version;
-			//if ((packet_header.ether_type == 0x0800) && // IP
+			act_reg->Data.fpga_mac_addr = packet_header.dest_mac;
+                        act_reg->Data.ipv4_header_len = packet_header.ipv4_header_len;
+			// if (packet_header.dest_mac == 0xAABBCCDDEEF1) {
+			// (packet_header.ether_type == 0x0800) && // IP
 			//		(packet_header.ip_version == 4) && // IPv4
 			//		(packet_header.ipv4_protocol == 0x11)) // UDP
-			//{
+			// {
 				rcv_state = RCV_GOOD;
-				memcpy(dout_gmem + o_idx, (char *) (&packet_in.data), BPERDW);
+				memcpy(dout_gmem + out_offset + o_idx, (char *) (&packet_in.data), BPERDW);
 				o_idx++;
-			//} else rcv_state = RCV_IGNORE;
+			// } else rcv_state = RCV_IGNORE;
 			break;
 		case RCV_IGNORE:
 			break;
 		case RCV_GOOD:
-			memcpy(dout_gmem + o_idx, (char *) (&packet_in.data), BPERDW);
+			memcpy(dout_gmem + out_offset + o_idx, (char *) (&packet_in.data), BPERDW);
 			o_idx++;
 			break;
 		}
@@ -71,6 +76,7 @@ static int process_action(snap_membus_t *din_gmem,
 				o_idx++;
 			}
 			rcv_state = RCV_INIT;
+		        act_reg->Data.user = packet_in.user;
 		}
 	}
 

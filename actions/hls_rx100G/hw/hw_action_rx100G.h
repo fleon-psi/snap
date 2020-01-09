@@ -27,7 +27,7 @@
 
 //--------------------------------------------------------------------
 // 1: simplify the data casting style
-#define RELEASE_LEVEL		0x00000001
+#define RELEASE_LEVEL		0x00000002
 
 typedef char word_t[BPERDW];
 //---------------------------------------------------------------------
@@ -49,22 +49,22 @@ typedef struct {
   };
 
   struct packet_header_t {
-  	ap_uint<48> dest_mac ;
-  	ap_uint<48> src_mac  ;
-  	ap_uint<16> ether_type ;
+  	uint64_t dest_mac ;
+  	uint64_t src_mac  ;
+  	uint32_t ether_type ;
 
-  	ap_uint<4> ip_version ;
-  	ap_uint<4> ipv4_header_len ;
-  	ap_uint<8>  ipv4_protocol  ;
-  	ap_uint<16> ipv4_total_len ;
-  	ap_uint<32> ipv4_header_checksum;
-  	ap_uint<32> ipv4_source_ip ;
-  	ap_uint<32> ipv4_dest_ip ;
+  	uint32_t ip_version ;
+  	uint32_t ipv4_header_len ;
+  	uint32_t ipv4_protocol  ;
+  	uint32_t ipv4_total_len ;
+  	uint32_t ipv4_header_checksum;
+  	uint32_t ipv4_source_ip ;
+  	uint32_t ipv4_dest_ip ;
 
-  	ap_uint<16> udp_src_port;
-  	ap_uint<16> udp_dest_port;
-  	ap_uint<16> udp_len;
-  	ap_uint<16> udp_checksum;
+  	uint32_t udp_src_port;
+  	uint32_t udp_dest_port;
+  	uint32_t udp_len;
+  	uint32_t udp_checksum;
 
   //	ap_uint<64> jf_frame_number;
   //	ap_uint<32> jf_exptime;

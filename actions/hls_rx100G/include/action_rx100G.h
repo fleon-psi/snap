@@ -36,6 +36,8 @@ typedef struct rx100G_job {
     uint64_t ether_type;
     uint64_t protocol;
     uint64_t version;
+    uint64_t user;
+    uint64_t ipv4_header_len;
 } rx100G_job_t;
 
 #ifdef __cplusplus
