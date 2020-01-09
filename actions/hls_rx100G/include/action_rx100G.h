@@ -33,11 +33,10 @@ typedef struct rx100G_job {
     uint64_t fpga_mac_addr;
     uint64_t packets_to_read;
     uint64_t read_size;
-    uint64_t ether_type;
-    uint64_t protocol;
-    uint64_t version;
+    uint64_t bad_packets;
+    uint64_t ignored_packets;
+    uint64_t good_packets;
     uint64_t user;
-    uint64_t ipv4_header_len;
 } rx100G_job_t;
 
 #ifdef __cplusplus

@@ -26,12 +26,12 @@ enum rcv_state_t {RCV_INIT, RCV_GOOD, RCV_IGNORE};
 static int process_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
-//		AXI_STREAM &dout_eth,
+		//		AXI_STREAM &dout_eth,
 		action_reg *act_reg)
 {
 	uint64_t o_idx = 0;
 	uint64_t out_offset = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
-
+size_t bytes_read;
 
 	ap_axiu_for_eth packet_in;
 
@@ -41,46 +41,57 @@ static int process_action(snap_membus_t *din_gmem,
 	rcv_state_t rcv_state = RCV_INIT;
 	packet_header_t packet_header;
 
-//	while (packets_read < act_reg->Data.packets_to_read) {
-	while (packets_read < 1) {
+	act_reg->Data.good_packets = 0;
+	act_reg->Data.ignored_packets = 0;
+	act_reg->Data.bad_packets = 0;
+
+	while (packets_read < act_reg->Data.packets_to_read) {
 #pragma HLS PIPELINE
 		din_eth.read(packet_in);
 		switch (rcv_state) {
 		case RCV_INIT:
 			decode_eth_1(packet_in.data, packet_header);
-			act_reg->Data.protocol = packet_header.ipv4_protocol;
-			act_reg->Data.ether_type = packet_header.ether_type;
-			act_reg->Data.version = packet_header.ip_version;
-			act_reg->Data.fpga_mac_addr = packet_header.dest_mac;
-                        act_reg->Data.ipv4_header_len = packet_header.ipv4_header_len;
-			// if (packet_header.dest_mac == 0xAABBCCDDEEF1) {
-			// (packet_header.ether_type == 0x0800) && // IP
-			//		(packet_header.ip_version == 4) && // IPv4
-			//		(packet_header.ipv4_protocol == 0x11)) // UDP
-			// {
+			if ((packet_header.dest_mac == act_reg->Data.fpga_mac_addr) &&
+					(packet_header.ether_type == 0x0800) && // IP
+					(packet_header.ip_version == 4) && // IPv4
+					(packet_header.ipv4_protocol == 0x11) && // UDP
+					(packet_header.ipv4_total_len == 8268)) // Packet length is consistent with JUNGFRAU
+			{
 				rcv_state = RCV_GOOD;
 				memcpy(dout_gmem + out_offset + o_idx, (char *) (&packet_in.data), BPERDW);
+				bytes_read += 64;
 				o_idx++;
-			// } else rcv_state = RCV_IGNORE;
+			} else {
+				rcv_state = RCV_IGNORE;
+				act_reg->Data.ignored_packets++;
+			}
 			break;
 		case RCV_IGNORE:
 			break;
 		case RCV_GOOD:
-			memcpy(dout_gmem + out_offset + o_idx, (char *) (&packet_in.data), BPERDW);
-			o_idx++;
+			if (o_idx > packet_header.ipv4_total_len/64+2) {
+				rcv_state = RCV_IGNORE;
+				act_reg->Data.bad_packets++;
+			}
+			else {
+				memcpy(dout_gmem + out_offset + o_idx, (char *) (&packet_in.data), BPERDW);
+				o_idx++;
+				bytes_read += 64;
+			}
 			break;
 		}
 		if (packet_in.last == 1) {
 			if (rcv_state == RCV_GOOD) {
-				packets_read++;
-				o_idx++;
+				act_reg->Data.good_packets++;
+				out_offset += o_idx + 1;
+				o_idx = 0;
 			}
 			rcv_state = RCV_INIT;
-		        act_reg->Data.user = packet_in.user;
+			act_reg->Data.user = packet_in.user;
 		}
 	}
 
-	act_reg->Data.read_size = (o_idx - 1) * 64;
+	act_reg->Data.read_size = bytes_read;
 
 	act_reg->Control.Retc = SNAP_RETC_SUCCESS;
 	return 0;
@@ -90,7 +101,7 @@ static int process_action(snap_membus_t *din_gmem,
 void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
-//		AXI_STREAM &dout_eth,
+		//		AXI_STREAM &dout_eth,
 		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
 		action_RO_config_reg *Action_Config)
@@ -117,7 +128,7 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
 #pragma HLS INTERFACE axis register off port=din_eth
-// #pragma HLS INTERFACE axis register off port=dout_eth
+	// #pragma HLS INTERFACE axis register off port=dout_eth
 
 	/* Required Action Type Detection - NO CHANGE BELOW */
 	//	NOTE: switch generates better vhdl than "if" */

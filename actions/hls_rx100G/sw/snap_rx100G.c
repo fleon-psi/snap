@@ -58,7 +58,7 @@ static void snap_prepare_rx100G(struct snap_job *cjob,
 		      SNAP_ADDRFLAG_END);
 
 	mjob->packets_to_read = NPACKETS;
-
+	mjob->fpga_mac_addr = 0xAABBCCDDEEF1;
 	snap_job_set(cjob, mjob, sizeof(*mjob), NULL, 0);
 }
 
@@ -154,10 +154,9 @@ int main()
 	__hexdump(stderr, &mjob, sizeof(mjob));
 
 	printf(" Loaded bytes %ld\n", mjob.read_size);
-	printf(" Ether type %lx\n", mjob.ether_type);
-	printf(" Protocol %lx\n", mjob.protocol);
-	printf(" Version %lx\n", mjob.version);
-	printf(" IP Header Length %lx\n", mjob.ipv4_header_len);
+	printf(" Good packets %lx\n", mjob.good_packets);
+	printf(" Bad packets %lx\n", mjob.bad_packets);
+	printf(" Ignored Packets %lx\n", mjob.ignored_packets);
 	printf(" User %lx\n", mjob.user);
 	printf(" MAC %lx\n", mjob.fpga_mac_addr);
 
