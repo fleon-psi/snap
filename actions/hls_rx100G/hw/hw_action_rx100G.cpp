@@ -81,6 +81,7 @@ size_t bytes_read;
 			break;
 		}
 		if (packet_in.last == 1) {
+			if ((rcv_state == RCV_GOOD) || (rcv_state == RCV_IGNORE)) packets_read++;
 			if (rcv_state == RCV_GOOD) {
 				act_reg->Data.good_packets++;
 				out_offset += o_idx + 1;
