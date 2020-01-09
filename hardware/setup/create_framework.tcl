@@ -240,11 +240,11 @@ if { $eth_used == TRUE } {
   create_ip_run [get_files -of_objects [get_fileset sources_1] $ip_dir/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd] >> $log_file
 
   launch_runs eth_100G_cmac_usplus_0_0_synth_1 >> $log_file
-  launch_runs eth_100G_axis_clock_converter_rx_0_0_synth_1 >> $log_file
+  launch_runs eth_100G_axis_data_fifo_0_0_synth_1 >> $log_file
   launch_runs eth_100G_util_vector_logic_0_0_synth_1 >> $log_file
 
   wait_on_run eth_100G_cmac_usplus_0_0_synth_1 >> $log_file
-  wait_on_run eth_100G_axis_clock_converter_rx_0_0_synth_1 >> $log_file
+  wait_on_run eth_100G_axis_data_fifo_0_0_synth_1 >> $log_file
   wait_on_run eth_100G_util_vector_logic_0_0_synth_1 >> $log_file
 
 # Enable for ethernet TX
