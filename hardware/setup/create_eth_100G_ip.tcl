@@ -53,7 +53,7 @@ update_ip_catalog -rebuild -scan_changes
   # Create instance: axis_data_fifo_0, and set properties
   set axis_data_fifo_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_data_fifo:2.0 axis_data_fifo_0 ]
   set_property -dict [ list \
-   CONFIG.FIFO_DEPTH {1024} \
+   CONFIG.FIFO_DEPTH {8192} \
    CONFIG.IS_ACLK_ASYNC {1} \
  ] $axis_data_fifo_0
 
