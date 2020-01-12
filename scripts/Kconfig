@@ -382,15 +382,6 @@ choice
         select DISABLE_SDRAM_AND_BRAM
         select DISABLE_NVME
 
-    config HLS_ETHERNET_EXAMPLE
-		bool "HLS Ethernet example"
-        help
-            This example is written in C and compiled with HLS
-        select ENABLE_HLS_SUPPORT
-        select ENABLE_ETHERNET
-        select DISABLE_SDRAM_AND_BRAM
-        select DISABLE_NVME
-
     config HLS_RX100G
 		bool "HLS 100G receiver"
         help
