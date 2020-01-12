@@ -31,6 +31,14 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 //----------------------------------------------------------------------
 static int process_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
+                snap_membus_t *d_hbm_p0,
+                snap_membus_t *d_hbm_p1,
+                snap_membus_t *d_hbm_p2,
+                snap_membus_t *d_hbm_p3,
+                snap_membus_t *d_hbm_p4,
+                snap_membus_t *d_hbm_p5,
+                snap_membus_t *d_hbm_p6,
+                snap_membus_t *d_hbm_p7,
 		AXI_STREAM &din_eth,
 		action_reg *act_reg)
 {
@@ -109,6 +117,14 @@ static int process_action(snap_membus_t *din_gmem,
 //--- TOP LEVEL MODULE -------------------------------------------------
 void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
+		snap_membus_t *d_hbm_p0,
+		snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2,
+		snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4,
+		snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6,
+		snap_membus_t *d_hbm_p7,
 		AXI_STREAM &din_eth,
 		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
@@ -135,6 +151,24 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE s_axilite port=act_reg bundle=ctrl_reg offset=0x100
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
+	// HBM memory Interface
+#pragma HLS INTERFACE m_axi port=d_hbm_p0 bundle=card_hbm_p0 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+#pragma HLS INTERFACE m_axi port=d_hbm_p1 bundle=card_hbm_p1 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+#pragma HLS INTERFACE m_axi port=d_hbm_p2 bundle=card_hbm_p2 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+#pragma HLS INTERFACE m_axi port=d_hbm_p3 bundle=card_hbm_p3 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+#pragma HLS INTERFACE m_axi port=d_hbm_p4 bundle=card_hbm_p4 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+#pragma HLS INTERFACE m_axi port=d_hbm_p5 bundle=card_hbm_p5 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+#pragma HLS INTERFACE m_axi port=d_hbm_p6 bundle=card_hbm_p6 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+#pragma HLS INTERFACE m_axi port=d_hbm_p7 bundle=card_hbm_p7 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 latency=128
+
 #pragma HLS INTERFACE axis register off port=din_eth
 	// #pragma HLS INTERFACE axis register off port=dout_eth
 
@@ -152,7 +186,7 @@ void hls_action(snap_membus_t *din_gmem,
 	default:
 		/* process_action(din_gmem, dout_gmem, d_ddrmem, act_reg); */
 		// process_action(din_gmem, dout_gmem, din_eth, dout_eth, act_reg);
-		process_action(din_gmem, dout_gmem, din_eth, act_reg);
+		process_action(din_gmem, dout_gmem, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, din_eth, act_reg);
 		break;
 	}
 }
