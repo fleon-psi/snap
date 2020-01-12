@@ -34,7 +34,6 @@ static int process_action(snap_membus_t *din_gmem,
 		AXI_STREAM &din_eth,
 		action_reg *act_reg)
 {
-	uint64_t o_idx = 0;
 	uint64_t out_offset = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
 	size_t bytes_read = 0;
 
@@ -66,41 +65,36 @@ static int process_action(snap_membus_t *din_gmem,
 					(packet_in.last == 0))
 			{
 				rcv_state = RCV_GOOD;
-				memcpy(dout_gmem + out_offset + o_idx, (char *) (&packet_in.data), BPERDW);
+				memcpy(dout_gmem + out_offset, (char *) (&packet_in.data), BPERDW);
 				bytes_read += 64;
-				o_idx++;
+				for (int i = 0; i < 129; i++) {
+                                    if (packet_in.last == 1) rcv_state = RCV_BAD;
+                                    else {
+                                        din_eth.read(packet_in);
+                                        ap_uint<512> tmp = packet_in.data;
+                                        mask_tkeep(tmp,packet_in.keep);
+                                        memcpy(dout_gmem + out_offset + i + 1, (char *) (&tmp), BPERDW);
+                                        bytes_read += 64;
+                                    }
+                                }
 			} else {
 				rcv_state = RCV_IGNORE;
 				act_reg->Data.ignored_packets++;
 			}
 			break;
-
-		case RCV_GOOD:
-			if (o_idx >= 130) rcv_state = RCV_BAD; // Cannot receive more than 130
-			else {
-				ap_uint<512> tmp = packet_in.data;
-				mask_tkeep(tmp,packet_in.keep);
-				memcpy(dout_gmem + out_offset + o_idx, (char *) (&tmp), BPERDW);
-				o_idx++;
-				bytes_read += 64;
-			}
-			break;
 		case RCV_IGNORE:
-				case RCV_BAD:
-					break;
+		case RCV_BAD:
+			break;
 		}
 		if (packet_in.last == 1) {
 			if ((rcv_state == RCV_GOOD) || (rcv_state == RCV_BAD)) packets_read++;
 			if ((rcv_state == RCV_BAD) ||
-					((rcv_state == RCV_GOOD) && (packet_in.user == 1)) ||
-					((rcv_state == RCV_GOOD) && (o_idx != 130))) {
+					((rcv_state == RCV_GOOD) && (packet_in.user == 1))) {
 				act_reg->Data.bad_packets++;
 				act_reg->Data.user += packet_in.user;
-				o_idx = 0; // offset stays the same, so bad data will be overwritten
 			} else if (rcv_state == RCV_GOOD) {
 				act_reg->Data.good_packets++;
 				out_offset += 130;
-				o_idx = 0;
 			}
 			rcv_state = RCV_INIT;
 		}
