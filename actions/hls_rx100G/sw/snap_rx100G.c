@@ -149,14 +149,14 @@ int main()
 			strerror(errno));
 		goto out_error2;
 	}
-        __hexdump(stdout, obuff, size);
+        __hexdump(stdout, obuff, 130*64);
 
 	__hexdump(stderr, &mjob, sizeof(mjob));
 
 	printf(" Loaded bytes %ld\n", mjob.read_size);
-	printf(" Good packets %lx\n", mjob.good_packets);
-	printf(" Bad packets %lx\n", mjob.bad_packets);
-	printf(" Ignored Packets %lx\n", mjob.ignored_packets);
+	printf(" Good packets %ld\n", mjob.good_packets);
+	printf(" Bad packets %ld\n", mjob.bad_packets);
+	printf(" Ignored Packets %ld\n", mjob.ignored_packets);
 	printf(" User %lx\n", mjob.user);
 	printf(" MAC %lx\n", mjob.fpga_mac_addr);
 
