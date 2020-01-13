@@ -513,11 +513,7 @@ endif
 .PHONY: clean
 clean:
 	@echo -e "[CLEAN ENVIRONMENT...] start `date +"%T %a %b %d %Y"`"
-<<<<<<< HEAD
-	@$(RM)    .hw_project_done .create_snap_ip_done .create_nvme_done .create_ethernet_done
-=======
-	@$(RM)    .hw_project_done .create_snap_ip_done .create_nvme_done .create_hbm_done
->>>>>>> f4d23d052bea1d851c7ae23d8d5ba97f5a74653c
+	@$(RM)    .hw_project_done .create_snap_ip_done .create_nvme_done .create_ethernet_done .create_hbm_done
 	@$(RM) -r $(SNAP_PP_FILES_VHD)                   \
 	          $(SNAP_SIM_CORE)/top.sv_source         \
 	          $(SNAP_SIM_NVME)/endp_4_pipe32.v       \
