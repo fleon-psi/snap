@@ -31,6 +31,8 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 //----------------------------------------------------------------------
 static int process_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
+                snap_membus_t *d_hbm_p0,
+                snap_membus_t *d_hbm_p1,
 		AXI_STREAM &din_eth,
 		action_reg *act_reg)
 {
@@ -108,6 +110,8 @@ static int process_action(snap_membus_t *din_gmem,
 //--- TOP LEVEL MODULE -------------------------------------------------
 void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
+                snap_membus_t *d_hbm_p0,
+                snap_membus_t *d_hbm_p1,
 		AXI_STREAM &din_eth,
 		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
@@ -121,6 +125,11 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE m_axi port=dout_gmem bundle=host_mem offset=slave depth=512 \
 		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE s_axilite port=dout_gmem bundle=ctrl_reg offset=0x040
+
+#pragma HLS INTERFACE m_axi port=d_hbm_p0 bundle=card_hbm_p0 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 
+#pragma HLS INTERFACE m_axi port=d_hbm_p1 bundle=card_hbm_p1 offset=slave depth=512 \
+  max_read_burst_length=64  max_write_burst_length=64 
 
 	/*  // DDR memory Interface - CAN BE COMMENTED IF UNUSED
 	 * #pragma HLS INTERFACE m_axi port=d_ddrmem bundle=card_mem0 offset=slave depth=512 \
