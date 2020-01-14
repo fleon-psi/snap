@@ -70,7 +70,7 @@ static int process_action(snap_membus_t *din_gmem,
 				for (int i = 0; i < 128; i++) {
 					din_eth.read(packet_in);
 					bytes_read += 64;
-//					memcpy(dout_gmem + out_offset + i, (char *) (&packet_in.data), BPERDW);
+					memcpy(dout_gmem + out_offset + i, (char *) (&packet_in.data), BPERDW);
 					if(packet_in.last == 1) rcv_state = RCV_BAD;
 				}
 				din_eth.read(packet_in);
