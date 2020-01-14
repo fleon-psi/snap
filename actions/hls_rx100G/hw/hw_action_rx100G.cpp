@@ -53,7 +53,7 @@ static int process_action(snap_membus_t *din_gmem,
 	while (packets_read < act_reg->Data.packets_to_read) {
 #pragma HLS PIPELINE
 		din_eth.read(packet_in);
-		//if (packet_in.last == 1) rcv_state = RCV_IGNORE;
+
 		switch (rcv_state) {
 		case RCV_INIT:
 			decode_eth_1(packet_in.data, packet_header);
@@ -67,21 +67,20 @@ static int process_action(snap_membus_t *din_gmem,
 				rcv_state = RCV_GOOD;
 				memcpy(dout_gmem + out_offset, (char *) (&packet_in.data), BPERDW);
 				bytes_read += 64;
-				for (int i = 0; i < 129; i++) {
-                                    if (packet_in.last == 1) rcv_state = RCV_BAD;
-                                    else {
-                                        din_eth.read(packet_in);
-                                        ap_uint<512> tmp = packet_in.data;
-                                        mask_tkeep(tmp,packet_in.keep);
-                                        memcpy(dout_gmem + out_offset + i + 1, (char *) (&tmp), BPERDW);
-                                        bytes_read += 64;
-                                    }
-                                }
+				for (int i = 0; i < 128; i++) {
+					din_eth.read(packet_in);
+					bytes_read += 64;
+//					memcpy(dout_gmem + out_offset + i, (char *) (&packet_in.data), BPERDW);
+					if(packet_in.last == 1) rcv_state = RCV_BAD;
+				}
+				din_eth.read(packet_in);
+
 			} else {
 				rcv_state = RCV_IGNORE;
 				act_reg->Data.ignored_packets++;
 			}
 			break;
+		case RCV_GOOD:
 		case RCV_IGNORE:
 		case RCV_BAD:
 			break;
@@ -116,11 +115,11 @@ void hls_action(snap_membus_t *din_gmem,
 {
 	// Host Memory AXI Interface - CANNOT BE REMOVED - NO CHANGE BELOW
 #pragma HLS INTERFACE m_axi port=din_gmem bundle=host_mem offset=slave depth=512 \
-		max_read_burst_length=64  max_write_burst_length=64
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE s_axilite port=din_gmem bundle=ctrl_reg offset=0x030
 
 #pragma HLS INTERFACE m_axi port=dout_gmem bundle=host_mem offset=slave depth=512 \
-		max_read_burst_length=64  max_write_burst_length=64 latency=256
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE s_axilite port=dout_gmem bundle=ctrl_reg offset=0x040
 
 	/*  // DDR memory Interface - CAN BE COMMENTED IF UNUSED
