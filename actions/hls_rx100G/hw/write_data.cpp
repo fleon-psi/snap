@@ -16,7 +16,7 @@
 
 #include "hw_action_rx100G.h"
 
-void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset, uint64_t &bytes_written) {
+void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset) {
 	data_packet_t packet_in;
 	in.read(packet_in);
 
@@ -29,10 +29,14 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset, ui
 				packet_in.eth_packet * (4096/32)
 				+ packet_in.axis_packet;
 //		memcpy(dout_gmem + (act_reg->Data.out.addr >> 6) + offset, (char *) (&packet_in.data), BPERDW);
-		memcpy(dout_gmem + mem_offset + counter, (char *) (&packet_in.data), BPERDW);
+		memcpy(dout_gmem + mem_offset + counter + 1, (char *) (&packet_in.data), BPERDW);
 		counter++;
 
 		in.read(packet_in);
 	}
-	bytes_written = counter * 64;
+	ap_uint<512> statistics;
+	uint64_t bytes_written = counter * 64;
+	statistics(63,0) = bytes_written;
+	statistics(127,64) = packet_in.frame_number;
+	memcpy(dout_gmem+mem_offset, (char *) &statistics, BPERDW);
 }

@@ -99,6 +99,11 @@ ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 }
 
 void convert(DATA_STREAM &raw_in, DATA_STREAM &converted_out) {
+	//TODO: Insert converter
+	//TODO: Add HBM
+	//TODO: Add pedestal G0
+	//TODO: Insert pedestal calculation procedure
+
 	data_packet_t packet_in;
 	data_packet_t packet_out;
 	raw_in.read(packet_in);

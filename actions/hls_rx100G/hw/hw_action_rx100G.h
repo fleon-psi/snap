@@ -136,7 +136,7 @@ void data_pack(ap_uint<512> &out, ap_uint<16> in[32]);
 
 void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settings, eth_stat_t &eth_stat);
 void convert(DATA_STREAM &raw_in, DATA_STREAM &converted_out);
-void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset, uint64_t &bytes_written);
+void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset);
 
 ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 		packed_pedeG0_t packed_pedeG0, ap_uint<512> packed_gainG0,

@@ -28,7 +28,7 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 	}
 }
 
-void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t &eth_stat, snap_membus_t *dout_gmem, size_t mem_offset, uint64_t &bytes_written) {
+void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t &eth_stat, snap_membus_t *dout_gmem, size_t mem_offset) {
 #pragma HLS DATAFLOW
 
 	DATA_STREAM raw;
@@ -36,7 +36,7 @@ void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t
 
 	read_eth_packet(din_eth, raw, eth_settings, eth_stat);
 	convert(raw, converted);
-	write_data(converted, dout_gmem, mem_offset, bytes_written);
+	write_data(converted, dout_gmem, mem_offset);
 }
 
 //----------------------------------------------------------------------
@@ -61,12 +61,11 @@ static int process_action(snap_membus_t *din_gmem,
 	eth_stats.good_packets = 0;
 	eth_stats.ignored_packets = 0;
 
-	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, mem_offset, bytes_written);
+	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, mem_offset);
 
 	act_reg->Data.good_packets = eth_stats.good_packets;
 	act_reg->Data.bad_packets = eth_stats.bad_packets;
 	act_reg->Data.ignored_packets = eth_stats.ignored_packets;
-	act_reg->Data.read_size = bytes_written;
 
 	act_reg->Control.Retc = SNAP_RETC_SUCCESS;
 

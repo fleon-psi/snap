@@ -143,9 +143,16 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 			break;
 		}
 		if (packet_in.last == 1) {
-			if ((rcv_state == RCV_BAD) || ((rcv_state != RCV_IGNORE) && (axis_packet != 128)) || (packet_in.user == 1)) eth_stat.bad_packets++;
-			else if (rcv_state == RCV_GOOD) eth_stat.good_packets++;
-			else if (rcv_state == RCV_IGNORE) eth_stat.ignored_packets++;
+			if ((rcv_state == RCV_BAD) || ((rcv_state != RCV_IGNORE) && (axis_packet != 128)) || (packet_in.user == 1)) {
+				//eth_stat.bad_packets++;
+				packets_read++;
+			}
+			else if (rcv_state == RCV_GOOD) {
+				//eth_stat.good_packets++;
+				packets_read++;
+			}
+			// else if (rcv_state == RCV_IGNORE) eth_stat.ignored_packets++;
+			rcv_state = RCV_INIT;
 		}
 	}
 	packet_out.exit = 1;
