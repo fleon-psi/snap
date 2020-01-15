@@ -18,7 +18,7 @@
 #include "ap_int.h"
 #include "hw_action_rx100G.h"
 
-enum rcv_state_t {RCV_INIT, RCV_GOOD, RCV_BAD, RCV_IGNORE};
+
 
 inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 #pragma HLS UNROLL
@@ -26,6 +26,18 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 		if (keep[i] == 0) data(i*8+7,i*8) = 0;
 	}
 }
+
+void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t &eth_stat, snap_membus_t *dout_gmem, size_t mem_offset, uint64_t &bytes_written) {
+#pragma HLS DATAFLOW
+
+	DATA_STREAM raw;
+	DATA_STREAM converted;
+
+	read_eth_packet(din_eth, raw, eth_settings, eth_stat);
+	convert(raw, converted);
+	write_data(converted, dout_gmem, mem_offset, bytes_written);
+}
+
 //----------------------------------------------------------------------
 //--- MAIN PROGRAM -----------------------------------------------------
 //----------------------------------------------------------------------
@@ -34,74 +46,29 @@ static int process_action(snap_membus_t *din_gmem,
 		AXI_STREAM &din_eth,
 		action_reg *act_reg)
 {
-	uint64_t out_offset = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
-	size_t bytes_read = 0;
 
-	ap_axiu_for_eth packet_in;
+	size_t mem_offset = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
 
-	word_t text;
+	uint64_t bytes_written = 0;
 
-	size_t packets_read = 0;
-	rcv_state_t rcv_state = RCV_INIT;
-	packet_header_t packet_header;
+	eth_settings_t eth_settings;
+	eth_settings.fpga_mac_addr = act_reg->Data.fpga_mac_addr;
+	eth_settings.expected_packets = act_reg->Data.packets_to_read;
 
-	act_reg->Data.good_packets = 0;
-	act_reg->Data.ignored_packets = 0;
-	act_reg->Data.bad_packets = 0;
-	act_reg->Data.user = 0;
+	eth_stat_t eth_stats;
+	eth_stats.bad_packets = 0;
+	eth_stats.good_packets = 0;
+	eth_stats.ignored_packets = 0;
 
-	while (packets_read < act_reg->Data.packets_to_read) {
-#pragma HLS PIPELINE
-		din_eth.read(packet_in);
+	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, mem_offset, bytes_written);
 
-		switch (rcv_state) {
-		case RCV_INIT:
-			decode_eth_1(packet_in.data, packet_header);
-			if ((packet_header.dest_mac == act_reg->Data.fpga_mac_addr) &&
-					(packet_header.ether_type == 0x0800) && // IP
-					(packet_header.ip_version == 4) && // IPv4
-					(packet_header.ipv4_protocol == 0x11) && // UDP
-					(packet_header.ipv4_total_len == 8268) && // Packet length is consistent with JUNGFRAU
-					(packet_in.last == 0))
-			{
-				rcv_state = RCV_GOOD;
-				memcpy(dout_gmem + out_offset, (char *) (&packet_in.data), BPERDW);
-				bytes_read += 64;
-				for (int i = 0; i < 128; i++) {
-					din_eth.read(packet_in);
-					bytes_read += 64;
-//					memcpy(dout_gmem + out_offset + i, (char *) (&packet_in.data), BPERDW);
-					if(packet_in.last == 1) rcv_state = RCV_BAD;
-				}
-				din_eth.read(packet_in);
-
-			} else {
-				rcv_state = RCV_IGNORE;
-				act_reg->Data.ignored_packets++;
-			}
-			break;
-		case RCV_GOOD:
-		case RCV_IGNORE:
-		case RCV_BAD:
-			break;
-		}
-		if (packet_in.last == 1) {
-			if ((rcv_state == RCV_GOOD) || (rcv_state == RCV_BAD)) packets_read++;
-			if ((rcv_state == RCV_BAD) ||
-					((rcv_state == RCV_GOOD) && (packet_in.user == 1))) {
-				act_reg->Data.bad_packets++;
-				act_reg->Data.user += packet_in.user;
-			} else if (rcv_state == RCV_GOOD) {
-				act_reg->Data.good_packets++;
-				out_offset += 130;
-			}
-			rcv_state = RCV_INIT;
-		}
-	}
-
-	act_reg->Data.read_size = bytes_read;
+	act_reg->Data.good_packets = eth_stats.good_packets;
+	act_reg->Data.bad_packets = eth_stats.bad_packets;
+	act_reg->Data.ignored_packets = eth_stats.ignored_packets;
+	act_reg->Data.read_size = bytes_written;
 
 	act_reg->Control.Retc = SNAP_RETC_SUCCESS;
+
 	return 0;
 }
 
