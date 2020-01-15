@@ -43,7 +43,7 @@ set bd_name  hbm_top
 #   --> follow HBM names <--
 # _______________________________________________________________________________
 #CHANGE_HBM_INTERFACES_NUMBER
-set  HBM_MEM_NUM 2
+set  HBM_MEM_NUM 8
 
 # Create HBM project
 create_project   $prj_name $root_dir/ip/hbm -part $fpga_part -force >> $log_file
@@ -186,20 +186,20 @@ set_property -dict [list                               \
 #  CONFIG.USER_MC_ENABLE_00 {TRUE}    => enable/disable the MC
 #  CONFIG.USER_SAXI_00 {true}         => enable/disable each of the AXI interface/HBM memory
 set_property -dict [list \
-  CONFIG.USER_MEMORY_DISPLAY {512}  \
+  CONFIG.USER_MEMORY_DISPLAY {2048}  \
   CONFIG.USER_CLK_SEL_LIST0 {AXI_00_ACLK}  \
   CONFIG.USER_MC_ENABLE_00 {TRUE}  \
   CONFIG.USER_SAXI_00 {true}  \
   CONFIG.USER_SAXI_01 {true}  \
-  CONFIG.USER_MC_ENABLE_01 {FALSE}  \
-  CONFIG.USER_SAXI_02 {false}  \
-  CONFIG.USER_SAXI_03 {false}  \
-  CONFIG.USER_MC_ENABLE_02 {FALSE}  \
-  CONFIG.USER_SAXI_04 {false}  \
-  CONFIG.USER_SAXI_05 {false}  \
-  CONFIG.USER_MC_ENABLE_03 {FALSE}  \
-  CONFIG.USER_SAXI_06 {false}  \
-  CONFIG.USER_SAXI_07 {false}  \
+  CONFIG.USER_MC_ENABLE_01 {TRUE}  \
+  CONFIG.USER_SAXI_02 {true}  \
+  CONFIG.USER_SAXI_03 {true}  \
+  CONFIG.USER_MC_ENABLE_02 {TRUE}  \
+  CONFIG.USER_SAXI_04 {true}  \
+  CONFIG.USER_SAXI_05 {true}  \
+  CONFIG.USER_MC_ENABLE_03 {TRUE}  \
+  CONFIG.USER_SAXI_06 {true}  \
+  CONFIG.USER_SAXI_07 {true}  \
   CONFIG.USER_MC_ENABLE_04 {FALSE}  \
   CONFIG.USER_MC_ENABLE_05 {FALSE}  \
   CONFIG.USER_MC_ENABLE_06 {FALSE}  \
