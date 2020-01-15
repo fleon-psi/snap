@@ -79,7 +79,7 @@ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 constant_22_zero
 set_property -dict [list CONFIG.CONST_WIDTH {22} CONFIG.CONST_VAL {0}] [get_bd_cells constant_22_zero]
 
 create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 constant_32_zero
-set_property -dict [list CONFIG.CONST_WIDTH {22} CONFIG.CONST_VAL {0}] [get_bd_cells constant_32_zero]
+set_property -dict [list CONFIG.CONST_WIDTH {32} CONFIG.CONST_VAL {0}] [get_bd_cells constant_32_zero]
 
 
 #====================
