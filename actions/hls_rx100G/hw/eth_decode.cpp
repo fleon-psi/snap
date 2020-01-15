@@ -1,3 +1,19 @@
+/*
+ * Copyright 2019 Paul Scherrer Institute
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "hw_action_rx100G.h"
 
 enum rcv_state_t {RCV_INIT, RCV_JF_HEADER, RCV_GOOD, RCV_BAD, RCV_IGNORE};
@@ -77,7 +93,7 @@ void decode_eth_2(ap_uint<512> val_in, packet_header_t &header_out) {
 }
 
 void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settings, eth_stat_t &eth_stat) {
-
+//TODO: ARP + ICMP would be nice
 	rcv_state_t rcv_state = RCV_INIT;
 	uint64_t packets_read = 0;
 	ap_uint<8> axis_packet = 0; // 0..256 , but >=128 means error

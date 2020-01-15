@@ -3,6 +3,7 @@
 
 /*
  * Copyright 2017 International Business Machines
+ * Copyright 2019 Paul Scherrer Institute
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +38,8 @@ typedef struct rx100G_job {
     uint64_t ignored_packets;
     uint64_t good_packets;
     uint64_t user;
+    uint32_t fpga_ipv4_addr;
+    uint16_t fpga_udp_port;
 } rx100G_job_t;
 
 #ifdef __cplusplus
