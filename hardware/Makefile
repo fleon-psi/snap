@@ -135,6 +135,7 @@ check_snap_settings:
 	@echo "                        HLS_SUPPORT     = $(HLS_SUPPORT)"
 	@echo "                        BRAM_USED       = $(BRAM_USED)"
 	@echo "                        SDRAM_USED      = $(SDRAM_USED)"
+	@echo "                        HBM_USED        = $(HBM_USED)"
 	@echo "                        NVME_USED       = $(NVME_USED)"
 	@echo "                        ETHERNET_USED   = $(ETHERNET_USED)"
 	@echo "                        ILA_DEBUG       = $(ILA_DEBUG)"
@@ -274,6 +275,17 @@ action_hw: prepare_logs
 	@echo -e "[CREATE NVME.........] done  `date +"%T %a %b %d %Y"`";
 	@touch .create_nvme_done
 
+# HBM part - call a different bd if simulation or HBM (HBM not supported by xsim yet)
+.create_hbm_done:
+	@echo -e "[CREATE HBM..........] start `date +"%T %a %b %d %Y"`";
+	@if [ "$(BRAM_USED)" == "TRUE" ]; then \
+		cd $(BUILD_DIR)  &&  vivado -quiet -mode batch -source $(SETUP_DIR)/create_hbm_for_simu.tcl -notrace -log $(LOGS_DIR)/create_hbm.log -journal $(LOGS_DIR)/create_hbm.jou; \
+	else \
+		cd $(BUILD_DIR)  &&  vivado -quiet -mode batch -source $(SETUP_DIR)/create_hbm.tcl -notrace -log $(LOGS_DIR)/create_hbm.log -journal $(LOGS_DIR)/create_hbm.jou; \
+	fi
+	@echo -e "[CREATE HBM..........] done  `date +"%T %a %b %d %Y"`";
+	@touch .create_hbm_done
+
 create_hls_ip:
 	@cd $(BUILD_DIR) &&  vivado -quiet -mode batch -source $(SETUP_DIR)/create_hls_ip.tcl -notrace -log $(LOGS_DIR)/create_hls_ip.log -journal $(LOGS_DIR)/create_hls_ip.jou
 
@@ -284,6 +296,7 @@ create_project: snap_preprocess
 	@$(MAKE) -s create_hls_ip
 	@if [ "$(NVME_USED)" == "TRUE" ]; then $(MAKE) -s .create_nvme_done; fi
 	@if [ "$(ETHERNET_USED)" == "TRUE" ]; then $(MAKE) -s .create_ethernet_done; fi
+	@if [ "$(HBM_USED)" == "TRUE" ]; then $(MAKE) -s .create_hbm_done; fi
 	@cd $(BUILD_DIR)  &&  vivado -quiet -mode batch -source $(SETUP_DIR)/create_framework.tcl -notrace -log $(LOGS_DIR)/create_framework.log -journal $(LOGS_DIR)/create_framework.jou
 	@echo -e "[CREATE PROJECT......] done  `date +"%T %a %b %d %Y"`"
 
@@ -500,7 +513,7 @@ endif
 .PHONY: clean
 clean:
 	@echo -e "[CLEAN ENVIRONMENT...] start `date +"%T %a %b %d %Y"`"
-	@$(RM)    .hw_project_done .create_snap_ip_done .create_nvme_done .create_ethernet_done
+	@$(RM)    .hw_project_done .create_snap_ip_done .create_nvme_done .create_ethernet_done .create_hbm_done
 	@$(RM) -r $(SNAP_PP_FILES_VHD)                   \
 	          $(SNAP_SIM_CORE)/top.sv_source         \
 	          $(SNAP_SIM_NVME)/endp_4_pipe32.v       \
