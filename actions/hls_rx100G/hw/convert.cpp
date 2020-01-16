@@ -113,5 +113,6 @@ void convert(DATA_STREAM &raw_in, DATA_STREAM &converted_out) {
 		converted_out.write(packet_out);
 		raw_in.read(packet_in);
 	}
+	packet_out = packet_in;
 	converted_out.write(packet_out); // Write exit packet
 }
