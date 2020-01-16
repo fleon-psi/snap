@@ -20,23 +20,41 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset) {
 	data_packet_t packet_in;
 	in.read(packet_in);
 
-	int counter = 0;
-	while (packet_in.exit == 0) {
-#pragma HLS PIPELINE
-		// TODO: accounting which packets were converted
-		size_t offset = packet_in.frame_number * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
-				packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
-				packet_in.eth_packet * (4096/32)
-				+ packet_in.axis_packet;
-//		memcpy(dout_gmem + (act_reg->Data.out.addr >> 6) + offset, (char *) (&packet_in.data), BPERDW);
-		memcpy(dout_gmem + mem_offset + counter + 1, (char *) (&packet_in.data), BPERDW);
-		counter++;
+	int counter_ok = 0;
+	int counter_wrong = 0;
 
-		in.read(packet_in);
+
+	bool exit_condition = false;
+
+	while (packet_in.exit == 0) {
+		// TODO: accounting which packets were converted
+		// TODO: what if only part of packet arrives?
+#pragma HLS PIPELINE II=128
+		//size_t offset = packet_in.frame_number * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
+		//				packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
+		//				packet_in.eth_packet * (4096/32)
+		//				+ packet_in.axis_packet;
+		bool frame_ok = true;
+
+		ap_uint<512> buffer[128];
+
+		for (int i = 0; i < 128; i++) {
+			buffer[i] = packet_in.data;
+			if (packet_in.axis_packet != i) frame_ok = false;
+			// Stop reading, if: packet_in means exit or ((if this is first frame of a new axis_packet) && (we are in the middle of reading a frame))
+			if ((packet_in.exit == 0) && !((packet_in.axis_packet == 0) && (i > 0))) in.read(packet_in);
+			else frame_ok = false;
+		}
+		size_t offset = mem_offset + counter_ok * 128 + 1;
+
+		if (frame_ok) {
+			memcpy(dout_gmem + offset, buffer, 128*64);
+			counter_ok++;
+		} else counter_wrong++;
 	}
 	ap_uint<512> statistics;
-	uint64_t bytes_written = counter * 64;
-	statistics(63,0) = bytes_written;
+	statistics(31,0) = counter_ok;
+	statistics(63,32) = counter_wrong;
 	statistics(127,64) = packet_in.frame_number;
 	memcpy(dout_gmem+mem_offset, (char *) &statistics, BPERDW);
 }
