@@ -58,6 +58,31 @@ update_ip_catalog -rebuild -scan_changes
    CONFIG.IS_ACLK_ASYNC {1} \
  ] $axis_data_fifo_0
 
+  set s_axis_tx [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 s_axis_tx ]
+  set_property -dict [ list \
+   CONFIG.FREQ_HZ {250000000} \
+   CONFIG.HAS_TKEEP {1} \
+   CONFIG.HAS_TLAST {1} \
+   CONFIG.HAS_TREADY {1} \
+   CONFIG.HAS_TSTRB {0} \
+   CONFIG.LAYERED_METADATA {undef} \
+   CONFIG.TDATA_NUM_BYTES {64} \
+   CONFIG.TDEST_WIDTH {0} \
+   CONFIG.TID_WIDTH {0} \
+   CONFIG.TUSER_WIDTH {1} \
+   ] $s_axis_tx
+
+# Create instance: axis_clock_converter_tx_0, and set properties
+  set axis_clock_converter_tx_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_tx_0 ]
+  set_property -dict [ list \
+   CONFIG.HAS_TKEEP {1} \
+   CONFIG.HAS_TLAST {1} \
+   CONFIG.TDATA_NUM_BYTES {64} \
+   CONFIG.TUSER_WIDTH {1} \
+ ] $axis_clock_converter_tx_0
+
+
+
   # Create instance: cmac_usplus_0, and set properties
   set cmac_usplus_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:cmac_usplus:3.0 cmac_usplus_0 ]
   set_property -dict [ list \
@@ -101,46 +126,21 @@ update_ip_catalog -rebuild -scan_changes
   connect_bd_intf_net -intf_net i_gt_rx_1 [get_bd_intf_ports i_gt_rx] [get_bd_intf_pins cmac_usplus_0/gt_rx]
 
   # Create port connections
-  connect_bd_net -net cmac_usplus_0_gt_txusrclk2 [get_bd_pins axis_data_fifo_0/s_axis_aclk] [get_bd_pins cmac_usplus_0/gt_txusrclk2] [get_bd_pins cmac_usplus_0/rx_clk]
+  connect_bd_net -net cmac_usplus_0_gt_txusrclk2 [get_bd_pins axis_data_fifo_0/s_axis_aclk] [get_bd_pins cmac_usplus_0/gt_txusrclk2] [get_bd_pins cmac_usplus_0/rx_clk] [get_bd_pins axis_clock_converter_tx_0/m_axis_aclk]
   connect_bd_net -net cmac_usplus_0_usr_rx_reset [get_bd_pins cmac_usplus_0/usr_rx_reset] [get_bd_pins util_vector_logic_0/Op1]
   connect_bd_net -net ctl_tx_enable_1 [get_bd_ports i_ctl_tx_enable] [get_bd_pins cmac_usplus_0/ctl_tx_enable]
-  connect_bd_net -net i_capi_clk_1 [get_bd_ports i_capi_clk] [get_bd_pins axis_data_fifo_0/m_axis_aclk] [get_bd_pins cmac_usplus_0/drp_clk] [get_bd_pins cmac_usplus_0/init_clk]
+  connect_bd_net -net i_capi_clk_1 [get_bd_ports i_capi_clk] [get_bd_pins axis_data_fifo_0/m_axis_aclk] [get_bd_pins cmac_usplus_0/drp_clk] [get_bd_pins cmac_usplus_0/init_clk] [get_bd_pins axis_clock_converter_tx_0/s_axis_aclk]
   connect_bd_net -net i_core_rx_reset_1 [get_bd_ports i_core_rx_reset] [get_bd_pins cmac_usplus_0/core_rx_reset]
   connect_bd_net -net i_core_tx_reset_1 [get_bd_ports i_core_tx_reset] [get_bd_pins cmac_usplus_0/core_tx_reset]
   connect_bd_net -net i_ctl_rx_enable_1 [get_bd_ports i_ctl_rx_enable] [get_bd_pins cmac_usplus_0/ctl_rx_enable]
   connect_bd_net -net i_ctl_rx_rsfec_enable_1 [get_bd_ports i_ctl_rx_rsfec_enable] [get_bd_pins cmac_usplus_0/ctl_rx_rsfec_enable]
   connect_bd_net -net i_ctl_tx_rsfec_enable_1 [get_bd_ports i_ctl_tx_rsfec_enable] [get_bd_pins cmac_usplus_0/ctl_tx_rsfec_enable]
   connect_bd_net -net i_sys_reset_1 [get_bd_ports i_sys_reset] [get_bd_pins cmac_usplus_0/sys_reset]
-  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins axis_data_fifo_0/s_axis_aresetn] [get_bd_pins util_vector_logic_0/Res]
+  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins axis_data_fifo_0/s_axis_aresetn] [get_bd_pins util_vector_logic_0/Res] [get_bd_pins axis_clock_converter_tx_0/m_axis_aresetn]
 
-# Enable for ethernet TX
-#  set s_axis_tx [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 s_axis_tx ]
-#  set_property -dict [ list \
-#   CONFIG.FREQ_HZ {250000000} \
-#   CONFIG.HAS_TKEEP {1} \
-#   CONFIG.HAS_TLAST {1} \
-#   CONFIG.HAS_TREADY {1} \
-#   CONFIG.HAS_TSTRB {0} \
-#   CONFIG.LAYERED_METADATA {undef} \
-#   CONFIG.TDATA_NUM_BYTES {64} \
-#   CONFIG.TDEST_WIDTH {0} \
-#   CONFIG.TID_WIDTH {0} \
-#   CONFIG.TUSER_WIDTH {1} \
-#   ] $s_axis_tx
-# Create instance: axis_clock_converter_tx_0, and set properties
-#  set axis_clock_converter_tx_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_tx_0 ]
-#  set_property -dict [ list \
-#   CONFIG.HAS_TKEEP {1} \
-#   CONFIG.HAS_TLAST {1} \
-#   CONFIG.TDATA_NUM_BYTES {64} \
-#   CONFIG.TUSER_WIDTH {1} \
-# ] $axis_clock_converter_tx_0
-#  connect_bd_intf_net -intf_net axis_clock_converter_tx_0_M_AXIS [get_bd_intf_pins axis_clock_converter_tx_0/M_AXIS] [get_bd_intf_pins cmac_usplus_0/axis_tx]
-#  connect_bd_intf_net -intf_net s_axis_tx_1 [get_bd_intf_ports s_axis_tx] [get_bd_intf_pins axis_clock_converter_tx_0/S_AXIS]
-#  connect_bd_net -net i_capi_clk_1 [get_bd_ports i_capi_clk] [get_bd_pins axis_clock_converter_tx_0/s_axis_aclk] [get_bd_pins axis_clock_converter_rx_0/m_axis_aclk] [get_bd_pins cmac_usplus_0/drp_clk] [get_bd_pins cmac_usplus_0/init_clk]
-#  connect_bd_net -net cmac_usplus_0_gt_txusrclk2 [get_bd_pins axis_clock_converter_tx_0/m_axis_aclk] [get_bd_pins axis_clock_converter_rx_0/s_axis_aclk] [get_bd_pins cmac_usplus_0/gt_txusrclk2] [get_bd_pins cmac_usplus_0/rx_clk]
-#  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins axis_clock_converter_tx_0/s_axis_aresetn] [get_bd_pins axis_clock_converter_rx_0/m_axis_aresetn] [get_bd_pins util_vector_logic_0/Res]
-#  connect_bd_net -net xlconstant_0_dout [get_bd_pins axis_clock_converter_tx_0/m_axis_aresetn] [get_bd_pins axis_clock_converter_rx_0/s_axis_aresetn] [get_bd_pins xlconstant_0/dout]
+  connect_bd_intf_net -intf_net axis_clock_converter_tx_0_M_AXIS [get_bd_intf_pins axis_clock_converter_tx_0/M_AXIS] [get_bd_intf_pins cmac_usplus_0/axis_tx]
+  connect_bd_intf_net -intf_net s_axis_tx_1 [get_bd_intf_ports s_axis_tx] [get_bd_intf_pins axis_clock_converter_tx_0/S_AXIS]
+  connect_bd_net -net xlconstant_0_dout [get_bd_pins axis_clock_converter_tx_0/s_axis_aresetn] [get_bd_pins xlconstant_0/dout]
 
 assign_bd_address
 validate_bd_design

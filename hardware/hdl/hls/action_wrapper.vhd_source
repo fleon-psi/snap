@@ -140,12 +140,12 @@ ENTITY action_wrapper IS
     din_eth_TLAST             : IN STD_LOGIC;
 
 -- Enable for ethernet TX
---    dout_eth_TDATA            : OUT STD_LOGIC_VECTOR (511 downto 0);
---    dout_eth_TVALID           : OUT STD_LOGIC;
---    dout_eth_TREADY           : IN STD_LOGIC;
---    dout_eth_TKEEP            : OUT STD_LOGIC_VECTOR (63 downto 0);
---    dout_eth_TUSER            : OUT STD_LOGIC_VECTOR (0 downto 0);
---    dout_eth_TLAST            : OUT STD_LOGIC;
+    dout_eth_TDATA            : OUT STD_LOGIC_VECTOR (511 downto 0);
+    dout_eth_TVALID           : OUT STD_LOGIC;
+    dout_eth_TREADY           : IN STD_LOGIC;
+    dout_eth_TKEEP            : OUT STD_LOGIC_VECTOR (63 downto 0);
+    dout_eth_TUSER            : OUT STD_LOGIC_VECTOR (0 downto 0);
+    dout_eth_TLAST            : OUT STD_LOGIC;
 #endif
     --
 #ifdef CONFIG_ENABLE_HBM
@@ -823,12 +823,12 @@ ARCHITECTURE STRUCTURE OF action_wrapper IS
     din_eth_TLAST : IN STD_LOGIC;
 
 -- Enable for ethernet TX
---    dout_eth_TDATA : OUT STD_LOGIC_VECTOR (511 downto 0);
---    dout_eth_TVALID : OUT STD_LOGIC;
---    dout_eth_TREADY : IN STD_LOGIC;
---    dout_eth_TKEEP : OUT STD_LOGIC_VECTOR (63 downto 0);
---    dout_eth_TUSER : OUT STD_LOGIC_VECTOR (0 downto 0);
---    dout_eth_TLAST : OUT STD_LOGIC;
+    dout_eth_TDATA : OUT STD_LOGIC_VECTOR (511 downto 0);
+    dout_eth_TVALID : OUT STD_LOGIC;
+    dout_eth_TREADY : IN STD_LOGIC;
+    dout_eth_TKEEP : OUT STD_LOGIC_VECTOR (63 downto 0);
+    dout_eth_TUSER : OUT STD_LOGIC_VECTOR (0 downto 0);
+    dout_eth_TLAST : OUT STD_LOGIC;
 #endif
 
 #ifdef CONFIG_ENABLE_HBM
@@ -1494,12 +1494,12 @@ BEGIN
     din_eth_TUSER                => din_eth_TUSER,
     din_eth_TLAST                => din_eth_TLAST,
 -- Enable for ethernet TX
---    dout_eth_TDATA               => dout_eth_TDATA, 
---    dout_eth_TVALID              => dout_eth_TVALID,  
---    dout_eth_TREADY              => dout_eth_TREADY, 
---    dout_eth_TKEEP               => dout_eth_TKEEP,
---    dout_eth_TUSER               => dout_eth_TUSER,
---    dout_eth_TLAST               => dout_eth_TLAST,
+    dout_eth_TDATA               => dout_eth_TDATA, 
+    dout_eth_TVALID              => dout_eth_TVALID,  
+    dout_eth_TREADY              => dout_eth_TREADY, 
+    dout_eth_TKEEP               => dout_eth_TKEEP,
+    dout_eth_TUSER               => dout_eth_TUSER,
+    dout_eth_TLAST               => dout_eth_TLAST,
 #endif
 
 #ifdef CONFIG_ENABLE_HBM
