@@ -45,8 +45,11 @@ void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t
 static int process_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
+		AXI_STREAM &dout_eth,
 		action_reg *act_reg)
 {
+
+	send_gratious_arp(dout_eth, act_reg->Data.fpga_mac_addr, act_reg->Data.fpga_ipv4_addr);
 
 	size_t mem_offset = act_reg->Data.out.addr >> ADDR_RIGHT_SHIFT;
 
@@ -54,6 +57,8 @@ static int process_action(snap_membus_t *din_gmem,
 
 	eth_settings_t eth_settings;
 	eth_settings.fpga_mac_addr = act_reg->Data.fpga_mac_addr;
+	eth_settings.fpga_ipv4_addr = act_reg->Data.fpga_ipv4_addr;
+	eth_settings.fpga_udp_port = act_reg->Data.fpga_udp_port;
 	eth_settings.expected_packets = act_reg->Data.packets_to_read;
 
 	eth_stat_t eth_stats;
@@ -76,6 +81,7 @@ static int process_action(snap_membus_t *din_gmem,
 void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
+		AXI_STREAM &dout_eth,
 		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
 		action_RO_config_reg *Action_Config)
@@ -102,6 +108,7 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
 #pragma HLS INTERFACE axis register off port=din_eth
+#pragma HLS INTERFACE axis register off port=dout_eth
 	// #pragma HLS INTERFACE axis register off port=dout_eth
 
 	/* Required Action Type Detection - NO CHANGE BELOW */
@@ -118,7 +125,7 @@ void hls_action(snap_membus_t *din_gmem,
 	default:
 		/* process_action(din_gmem, dout_gmem, d_ddrmem, act_reg); */
 		// process_action(din_gmem, dout_gmem, din_eth, dout_eth, act_reg);
-		process_action(din_gmem, dout_gmem, din_eth, act_reg);
+		process_action(din_gmem, dout_gmem, din_eth, dout_eth, act_reg);
 		break;
 	}
 }
