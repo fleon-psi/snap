@@ -23,31 +23,33 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset) {
 	int counter_ok = 0;
 	int counter_wrong = 0;
 
-
-	bool exit_condition = false;
-
 	while (packet_in.exit == 0) {
-		// TODO: accounting which packets were converted
-		// TODO: what if only part of packet arrives?
+		while ((packet_in.exit == 0) && (packet_in.axis_packet == 0)) {
+			// TODO: accounting which packets were converted
 #pragma HLS PIPELINE II=128
-		//size_t offset = packet_in.frame_number * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
-		//				packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
-		//				packet_in.eth_packet * (4096/32)
-		//				+ packet_in.axis_packet;
-		bool frame_ok = true;
+			//size_t offset = packet_in.frame_number * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
+			//				packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
+			//				packet_in.eth_packet * (4096/32)
+			//				+ packet_in.axis_packet;
+			bool frame_ok = true;
 
-		ap_uint<512> buffer[128];
+			ap_uint<512> buffer[128];
 
-		size_t offset = mem_offset + counter_ok * 128 + 1;
+			size_t offset = mem_offset + counter_ok * 128 + 1;
 
-		for (int i = 0; i < 128; i++) {
-			buffer[i] = packet_in.data;
+			for (int i = 0; i < 128; i++) {
+				buffer[i] = packet_in.data;
+				in.read(packet_in);
+			}
+			if ((packet_in.axis_packet == 0) || (packet_in.exit == 1)) counter_ok++;
+			else counter_wrong++;
+
+			memcpy(dout_gmem + offset, buffer, 128*64);
+		}
+		while ((packet_in.exit == 0) && (packet_in.axis_packet != 0)) {
+			// forward, to get to a beginning of a meaningful packet.
 			in.read(packet_in);
 		}
-		if ((packet_in.axis_packet == 0) || (packet_in.exit == 1)) counter_ok++;
-		else counter_wrong++;
-
-		memcpy(dout_gmem + offset, buffer, 128*64);
 	}
 	ap_uint<512> statistics;
 	statistics(31,0) = counter_ok;
