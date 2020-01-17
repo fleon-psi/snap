@@ -156,10 +156,12 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 		switch (rcv_state) {
 		case RCV_INIT:
 			decode_eth_1(packet_in.data, header);
-			if ((header.dest_mac == eth_settings.fpga_mac_addr) &&
+			// UDP port is not checked - should it be as well?
+			if ((header.dest_mac == eth_settings.fpga_mac_addr) && // MAC address
 					(header.ether_type == 0x0800) && // IP
 					(header.ip_version == 4) && // IPv4
 					(header.ipv4_protocol == 0x11) && // UDP
+					(header.ipv4_dest_ip == eth_settings.fpga_ipv4_addr) && // IP address is correct
 					(header.ipv4_total_len == 8268)) {
 				rcv_state = RCV_JF_HEADER;
 				axis_packet = 0;

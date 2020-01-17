@@ -38,19 +38,16 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset) {
 
 		ap_uint<512> buffer[128];
 
-		for (int i = 0; i < 128; i++) {
-			buffer[i] = packet_in.data;
-			if (packet_in.axis_packet != i) frame_ok = false;
-			// Stop reading, if: packet_in means exit or ((if this is first frame of a new axis_packet) && (we are in the middle of reading a frame))
-			if ((packet_in.exit == 0) && !((packet_in.axis_packet == 0) && (i > 0))) in.read(packet_in);
-			else frame_ok = false;
-		}
 		size_t offset = mem_offset + counter_ok * 128 + 1;
 
-		if (frame_ok) {
-			memcpy(dout_gmem + offset, buffer, 128*64);
-			counter_ok++;
-		} else counter_wrong++;
+		for (int i = 0; i < 128; i++) {
+			buffer[i] = packet_in.data;
+			in.read(packet_in);
+		}
+		if ((packet_in.axis_packet == 0) || (packet_in.exit == 1)) counter_ok++;
+		else counter_wrong++;
+
+		memcpy(dout_gmem + offset, buffer, 128*64);
 	}
 	ap_uint<512> statistics;
 	statistics(31,0) = counter_ok;
