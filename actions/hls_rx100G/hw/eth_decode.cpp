@@ -95,7 +95,7 @@ void decode_eth_2(ap_uint<512> val_in, packet_header_t &header_out) {
 void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_address) {
 	ap_axiu_for_eth packet_out;
 	ap_uint<512> packet = 0;
-	packet(47,0) = 0xffffffff;
+	packet(47,0) = 0xffffffffffff;
 
 	packet(48+7, 48) = mac(47,40);
 	packet(48+15, 48+8) = mac(39,32);
@@ -129,7 +129,7 @@ void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_addres
 
 	packet_out.data = packet;
 	packet_out.last = 1;
-	packet_out.keep = 0xffffffff;
+	packet_out.keep = 0xFFFFFFFFFFFFFFFF;
 	packet_out.user = 0;
 
 	out << packet_out;
