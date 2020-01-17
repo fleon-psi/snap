@@ -17,17 +17,18 @@
 #include "hw_action_rx100G.h"
 
 ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
-		packed_pedeG0_t packed_pedeG0, ap_uint<512> packed_gainG0,
+		packed_pedeG0_t packed_pedeG0, ap_uint<512> packed_pedeG0RMS, ap_uint<512> packed_gainG0,
 		ap_uint<512> packed_pedeG1, ap_uint<512> packed_gainG1,
 		ap_uint<512> packed_pedeG2, ap_uint<512> packed_gainG2) {
 #pragma HLS PIPELINE
 	const ap_fixed<18,16, SC_RND_CONV> half = 0.5f;
 
 	ap_uint<16> in_val[32];
-	ap_uint<16> out_val[32];
+	ap_int<16> out_val[32];
 	Loop0: for (int i = 0; i < 512; i++) in_val[i/16][i%16] = data_in[i];
 
 	pedeG0_t pedeG0[32];
+
 	pedeG0RMS_t pedeG0RMS[32];
 	gainG0_t gainG0[32];
 	pedeG1G2_t pedeG1[32];
@@ -36,6 +37,8 @@ ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 	gainG1G2_t gainG2[32];
 
 	unpack_pedeG0(packed_pedeG0, pedeG0);
+
+	unpack_pedeG0RMS(packed_pedeG0RMS, pedeG0RMS);
 	unpack_gainG0(packed_gainG0, gainG0);
 	unpack_pedeG1G2(packed_pedeG1,pedeG1);
 	unpack_pedeG1G2(packed_pedeG2,pedeG2);
@@ -44,8 +47,8 @@ ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 
 	Loop1: for (int i = 0; i < 32; i++) {
 
-		if (in_val[i] == 0xffff) out_val[i] = 65535;
-		else if (in_val[i] == 0xc000) out_val[i] = 65534;
+		if (in_val[i] == 0xffff) out_val[i] = 32766; // can saturate G2 - overload
+		else if (in_val[i] == 0xc000) out_val[i] = -32700; //cannot saturate G1
 		else {
 			ap_fixed<18,16, SC_RND_CONV> val_diff;
 			ap_fixed<18,16, SC_RND_CONV> val_result;
@@ -77,7 +80,7 @@ ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 				break;
 			}
 			case 2:
-				out_val[i] = 65534;
+				out_val[i] = -32700;
 				break;
 			case 3: {
 				val_diff     = pedeG2[i] - adu;
@@ -96,23 +99,4 @@ ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 	pack_pedeG0(retval, pedeG0);
 	data_shuffle(data_out, out_val);
 	return retval;
-}
-
-void convert(DATA_STREAM &raw_in, DATA_STREAM &converted_out) {
-	//TODO: Insert converter
-	//TODO: Add HBM
-	//TODO: Add pedestal G0
-	//TODO: Insert pedestal calculation procedure
-
-	data_packet_t packet_in;
-	data_packet_t packet_out;
-	raw_in.read(packet_in);
-	while (packet_in.exit == 0) {
-#pragma HLS PIPELINE
-		packet_out = packet_in;
-		converted_out.write(packet_out);
-		raw_in.read(packet_in);
-	}
-	packet_out = packet_in;
-	converted_out.write(packet_out); // Write exit packet
 }

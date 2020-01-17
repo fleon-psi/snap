@@ -18,13 +18,13 @@
 
 void pack_pedeG0(packed_pedeG0_t& out, pedeG0_t in[32]) {
 	for (int i = 0; i < 32; i ++) {
-		for (int j = 0; j < 20; j ++) out[i*20+j] = in[i][j];
+		for (int j = 0; j < PEDE_G0_PRECISION; j ++) out[i*20+j] = in[i][j];
 	}
 }
 
 void unpack_pedeG0(packed_pedeG0_t in, pedeG0_t out[32]) {
 	for (int i = 0; i < 32; i ++) {
-		for (int j = 0; j < 20; j ++) out[i][j] = in[i*20+j];
+		for (int j = 0; j < PEDE_G0_PRECISION; j ++) out[i][j] = in[i*20+j];
 	}
 }
 
@@ -59,7 +59,7 @@ void unpack_pedeG0RMS(ap_uint<512> in, pedeG0RMS_t outr[32]) {
 	}
 }
 
-void data_shuffle(ap_uint<512> &out, ap_uint<16> in[32]) {
+void data_shuffle(ap_uint<512> &out, ap_int<16> in[32]) {
 #pragma HLS PIPELINE
 	for (int i = 0; i < 256; i++) {
 			out[i] = in[i%16][i/16];
@@ -67,7 +67,7 @@ void data_shuffle(ap_uint<512> &out, ap_uint<16> in[32]) {
     }
 }
 
-void data_pack(ap_uint<512> &out, ap_uint<16> in[32]) {
+void data_pack(ap_uint<512> &out, ap_int<16> in[32]) {
 #pragma HLS PIPELINE
 	for (int i = 0; i < 512; i++)
 				out[i] = in[i/16][i%16];

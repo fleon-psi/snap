@@ -27,6 +27,8 @@
 
 #define NMODULES 4
 
+#define PEDE_G0_PRECISION 22
+
 #define MODULE_COLS 1024
 #define MODULE_LINES 256
 
@@ -109,14 +111,14 @@ struct packet_header_t {
 	ap_uint<8> jf_header_version_type;
 };
 
-typedef ap_ufixed<20,14, SC_RND_CONV> pedeG0_t;
+typedef ap_ufixed<PEDE_G0_PRECISION,14, SC_RND_CONV> pedeG0_t;
 typedef ap_ufixed<16,2, SC_RND_CONV>  gainG0_t;
 typedef ap_ufixed<16,12, SC_RND_CONV> pedeG0RMS_t;
 
 typedef ap_ufixed<16,14, SC_RND_CONV> pedeG1G2_t;
 typedef ap_ufixed<16,3, SC_RND_CONV>  gainG1G2_t;
 
-typedef ap_uint<20*32> packed_pedeG0_t;
+typedef ap_uint<PEDE_G0_PRECISION*32> packed_pedeG0_t;
 
 typedef hls::stream<ap_axiu_for_eth> AXI_STREAM;
 typedef hls::stream<data_packet_t> DATA_STREAM;
@@ -131,14 +133,13 @@ void unpack_pedeG0RMS(ap_uint<512> in, pedeG0RMS_t[32]);
 void unpack_pedeG1G2(ap_uint<512> in, pedeG1G2_t outp[32]);
 void unpack_gainG1G2(ap_uint<512> in, gainG1G2_t outp[32]);
 
-void data_shuffle(ap_uint<512> &out, ap_uint<16> in[32]);
-void data_pack(ap_uint<512> &out, ap_uint<16> in[32]);
+void data_shuffle(ap_uint<512> &out, ap_int<16> in[32]);
+void data_pack(ap_uint<512> &out, ap_int<16> in[32]);
 
 void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_address);
 
-void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settings, eth_stat_t &eth_stat);
-void convert(DATA_STREAM &raw_in, DATA_STREAM &converted_out);
-void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset);
+void read_eth_packet(AXI_STREAM &deth_in, DATA_STREAM &raw_out, eth_settings_t eth_settings, eth_stat_t &eth_stat);
+void write_data(DATA_STREAM &raw_in, snap_membus_t *dout_gmem, size_t mem_offset);
 
 ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 		packed_pedeG0_t packed_pedeG0, ap_uint<512> packed_gainG0,
