@@ -72,10 +72,10 @@ void decode_eth_1(ap_uint<512> val_in, packet_header_t &header_out) {
 
 	ap_uint<32> udp_payload_pos = ipv4_payload_pos + 64; // 112 + 160 + 64 = 336 bits (42 bytes)
 
-	header_out.jf_frame_number = val_in(ipv4_payload_pos + 64-1, ipv4_payload_pos);
-	header_out.jf_exptime = val_in(ipv4_payload_pos + 96-1, ipv4_payload_pos + 64);
-	header_out.jf_packet_number = val_in(ipv4_payload_pos + 128 - 1, ipv4_payload_pos + 96);
-	header_out.jf_bunch_id(63,16) = val_in(ipv4_payload_pos + 176 - 1, ipv4_payload_pos + 128);
+	header_out.jf_frame_number = val_in(udp_payload_pos + 64-1, udp_payload_pos);
+	header_out.jf_exptime = val_in(udp_payload_pos + 96-1, udp_payload_pos + 64);
+	header_out.jf_packet_number = val_in(udp_payload_pos + 128 - 1, udp_payload_pos + 96);
+	header_out.jf_bunch_id(63,16) = val_in(udp_payload_pos + 176 - 1, udp_payload_pos + 128);
 }
 
 void decode_eth_2(ap_uint<512> val_in, packet_header_t &header_out) {
