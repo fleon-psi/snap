@@ -16,8 +16,8 @@
 
 #include "hw_action_rx100G.h"
 
-ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
-		packed_pedeG0_t packed_pedeG0, ap_uint<512> packed_pedeG0RMS, ap_uint<512> packed_gainG0,
+void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
+		packed_pedeG0_t& packed_pedeG0, ap_uint<512> packed_pedeG0RMS, ap_uint<512> packed_gainG0,
 		ap_uint<512> packed_pedeG1, ap_uint<512> packed_gainG1,
 		ap_uint<512> packed_pedeG2, ap_uint<512> packed_gainG2) {
 #pragma HLS PIPELINE
@@ -28,7 +28,6 @@ ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 	Loop0: for (int i = 0; i < 512; i++) in_val[i/16][i%16] = data_in[i];
 
 	pedeG0_t pedeG0[32];
-
 	pedeG0RMS_t pedeG0RMS[32];
 	gainG0_t gainG0[32];
 	pedeG1G2_t pedeG1[32];
@@ -96,7 +95,6 @@ ap_uint<512> convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 		}
 	}
 	packed_pedeG0_t retval;
-	pack_pedeG0(retval, pedeG0);
+	pack_pedeG0(packed_pedeG0, pedeG0);
 	data_shuffle(data_out, out_val);
-	return retval;
 }
