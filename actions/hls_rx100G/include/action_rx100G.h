@@ -20,6 +20,9 @@
 
 #include <snap_types.h>
 
+#define FRAME_BUF_SIZE        16384
+#define FRAME_STATUS_BUF_SIZE 16384
+
 #ifdef __cplusplus
 extern "C" {
 #endif

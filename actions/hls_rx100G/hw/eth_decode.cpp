@@ -184,9 +184,9 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 				packet_out.data(511,304) = packet_in.data(207, 0);
 				out.write(packet_out);
 				packet_out.data(303,0) = packet_in.data(511, 208);
+				packet_out.user = packet_in.user;
 				axis_packet++;
 			}
-
 			break;
 		case RCV_BAD:
 		case RCV_IGNORE:
