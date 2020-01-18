@@ -31,7 +31,7 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t &eth_stat, snap_membus_t *dout_gmem, size_t mem_offset) {
 #pragma HLS DATAFLOW
 	DATA_STREAM raw;
-#pragma HLS STREAM variable=raw depth=256
+#pragma HLS STREAM variable=raw depth=2048
 	read_eth_packet(din_eth, raw, eth_settings, eth_stat);
 	write_data(raw, dout_gmem, mem_offset);
 }
