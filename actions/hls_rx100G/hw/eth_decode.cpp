@@ -104,14 +104,14 @@ void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_addres
 	packet(48+39, 48+32) = mac(15,8);
 	packet(48+47, 48+40) = mac(7,0);
 
-	packet( 96+8, 96) = 0x0608; // 0x0806
+	packet( 96+16, 96) = 0x0608; // 0x0806
 	ap_uint<32> eth_payload_pos = 14*8; // 112 bits
 	packet(eth_payload_pos + 15, eth_payload_pos) = 0x0100; // ETH = 0x0001
 	packet(eth_payload_pos + 31, eth_payload_pos + 16) = 0x0008; // IPv4 = 0x0800
 	packet(eth_payload_pos + 39, eth_payload_pos + 32) = 0x6;
 	packet(eth_payload_pos + 47, eth_payload_pos + 40) = 0x4;
 	packet(eth_payload_pos + 63, eth_payload_pos + 48) = 0x0100; // 1 = request
-	ap_uint<32> arp_sha_pos = 14*8 + 8*8;
+	ap_uint<32> arp_sha_pos = eth_payload_pos + 8*8;
 
 	packet(arp_sha_pos + 7,  arp_sha_pos )     = mac(47,40);
 	packet(arp_sha_pos + 15, arp_sha_pos + 8)  = mac(39,32);
@@ -120,12 +120,12 @@ void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_addres
 	packet(arp_sha_pos + 39, arp_sha_pos + 32) = mac(15, 8);
 	packet(arp_sha_pos + 47, arp_sha_pos + 40) = mac( 7, 0);
 
-	ap_uint<32> arp_spa_pos = 14*8 + 12*8;
+	ap_uint<32> arp_spa_pos = arp_sha_pos + 6*8;
 
-	packet(arp_spa_pos + 7,  arp_spa_pos )     = mac(31,24);
-	packet(arp_spa_pos + 15, arp_spa_pos + 8)  = mac(23,16);
-	packet(arp_spa_pos + 23, arp_spa_pos + 16) = mac(15, 8);
-	packet(arp_spa_pos + 31, arp_spa_pos + 24) = mac( 7, 0);
+	packet(arp_spa_pos + 7,  arp_spa_pos )     = ipv4_address(31,24);
+	packet(arp_spa_pos + 15, arp_spa_pos + 8)  = ipv4_address(23,16);
+	packet(arp_spa_pos + 23, arp_spa_pos + 16) = ipv4_address(15, 8);
+	packet(arp_spa_pos + 31, arp_spa_pos + 24) = ipv4_address( 7, 0);
 
 	packet_out.data = packet;
 	packet_out.last = 1;
