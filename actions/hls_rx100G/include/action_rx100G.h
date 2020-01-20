@@ -34,14 +34,14 @@ extern "C" {
 /* Size limit is 108 Bytes */
 typedef struct rx100G_job {
     struct snap_addr out_frame_buffer;
-    uint64_t fpga_mac_addr;
-    uint32_t fpga_ipv4_addr;
     uint64_t packets_to_read;
     uint64_t read_size;
     uint64_t bad_packets;
     uint64_t ignored_packets;
     uint64_t good_packets;
-    uint64_t user;
+    uint64_t fpga_mac_addr;
+    uint32_t fpga_ipv4_addr;
+    uint32_t user;
 } rx100G_job_t;
 
 #ifdef __cplusplus
