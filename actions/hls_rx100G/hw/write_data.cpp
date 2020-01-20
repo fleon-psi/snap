@@ -16,52 +16,52 @@
 
 #include "hw_action_rx100G.h"
 
-void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset) {
+void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t out_frame_buffer_addr) {
 	data_packet_t packet_in;
 	in.read(packet_in);
 
 	int counter_ok = 0;
 	int counter_wrong = 0;
 
-        ap_uint<16> frame_status[FRAME_STATUS_BUF_SIZE*NMODULES]; // number of OK ETH packets received for the frame
-        for (int i = 0; i < FRAME_STATUS_BUF_SIZE*NMODULES; i++) frame_status[i] = 0;
-        uint64_t head[NMODULES]; // number of the newest packet received for the frame
+	ap_uint<16> frame_status[FRAME_STATUS_BUF_SIZE*NMODULES]; // number of OK ETH packets received for the frame
+	for (int i = 0; i < FRAME_STATUS_BUF_SIZE*NMODULES; i++) frame_status[i] = 0;
+	uint64_t head[NMODULES]; // number of the newest packet received for the frame
 
-        for (int i = 0; i < NMODULES; i++) head[i] = 0;
+	for (int i = 0; i < NMODULES; i++) head[i] = 0;
 
 	while (packet_in.exit == 0) {
 		while ((packet_in.exit == 0) && (packet_in.axis_packet == 0)) {
 			// TODO: accounting which packets were converted
 #pragma HLS PIPELINE II=128
-			//size_t offset = (packet_in.frame_number % FRAME_BUF_SIZE) * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
-			//				packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
-			//				packet_in.eth_packet * (4096/32)
-			//				+ packet_in.axis_packet;
+			size_t out_frame_addr = out_frame_buffer_addr +
+					       (packet_in.frame_number % FRAME_BUF_SIZE) * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
+							packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
+							packet_in.eth_packet * (4096/32);
+
 			bool frame_ok = true;
 
 			ap_uint<512> buffer[128];
-			size_t offset = mem_offset + counter_ok * 128 + 1;
 
-                        uint64_t frame_number0 = packet_in.frame_number;
-			
+			uint64_t frame_number0 = packet_in.frame_number;
+
 			if (packet_in.frame_number > head[packet_in.module]) {
-                                head[packet_in.module] = packet_in.frame_number;
-                        }
+				head[packet_in.module] = packet_in.frame_number;
+			}
 
 			ap_uint<1> axis_user;
 
 			for (int i = 0; i < 128; i++) {
-                                axis_user = packet_in.axis_user; // relevant for the last packet
+				axis_user = packet_in.axis_user; // relevant for the last packet
 				buffer[i] = packet_in.data;
 				in.read(packet_in);
 			}
 
-			memcpy(dout_gmem + offset, buffer, 128*64);
+			memcpy(dout_gmem + out_frame_addr, buffer, 128*64);
 
 			if (((packet_in.axis_packet == 0) && (axis_user == 0)) || (packet_in.exit == 1)) {
-                            counter_ok++;
-                            frame_status[packet_in.module * FRAME_STATUS_BUF_SIZE + (packet_in.frame_number % FRAME_STATUS_BUF_SIZE)]++;
-                        }
+				counter_ok++;
+				frame_status[packet_in.module * FRAME_STATUS_BUF_SIZE + (packet_in.frame_number % FRAME_STATUS_BUF_SIZE)]++;
+			}
 
 			else counter_wrong++;
 		}
@@ -74,5 +74,6 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t mem_offset) {
 	statistics(31,0) = counter_ok;
 	statistics(63,32) = counter_wrong;
 	statistics(127,64) = packet_in.frame_number;
-	memcpy(dout_gmem+mem_offset, (char *) &statistics, BPERDW);
+
+	// memcpy(dout_gmem+mem_offset, (char *) &statistics, BPERDW);
 }

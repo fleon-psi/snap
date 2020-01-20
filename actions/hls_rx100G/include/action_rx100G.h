@@ -33,7 +33,7 @@ extern "C" {
 /* Data structure used to exchange information between action and application */
 /* Size limit is 108 Bytes */
 typedef struct rx100G_job {
-    struct snap_addr out;
+    struct snap_addr out_frame_buffer;
     uint64_t fpga_mac_addr;
     uint32_t fpga_ipv4_addr;
     uint64_t packets_to_read;
