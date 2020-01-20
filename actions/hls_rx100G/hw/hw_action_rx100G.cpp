@@ -55,7 +55,6 @@ static int process_action(snap_membus_t *din_gmem,
 	eth_settings_t eth_settings;
 	eth_settings.fpga_mac_addr = act_reg->Data.fpga_mac_addr;
 	eth_settings.fpga_ipv4_addr = act_reg->Data.fpga_ipv4_addr;
-	eth_settings.fpga_udp_port = act_reg->Data.fpga_udp_port;
 	eth_settings.expected_packets = act_reg->Data.packets_to_read;
 
 	eth_stat_t eth_stats;

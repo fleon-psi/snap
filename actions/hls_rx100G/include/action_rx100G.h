@@ -35,14 +35,13 @@ extern "C" {
 typedef struct rx100G_job {
     struct snap_addr out;
     uint64_t fpga_mac_addr;
+    uint32_t fpga_ipv4_addr;
     uint64_t packets_to_read;
     uint64_t read_size;
     uint64_t bad_packets;
     uint64_t ignored_packets;
     uint64_t good_packets;
     uint64_t user;
-    uint32_t fpga_ipv4_addr;
-    uint16_t fpga_udp_port;
 } rx100G_job_t;
 
 #ifdef __cplusplus
