@@ -25,12 +25,7 @@
 #include "hls_snap.H"
 #include "../include/action_rx100G.h" /* HelloWorld Job definition */
 
-#define NMODULES 4
-
 #define PEDE_G0_PRECISION 22
-
-#define MODULE_COLS 1024
-#define MODULE_LINES 256
 
 //--------------------------------------------------------------------
 // 1: simplify the data casting style
