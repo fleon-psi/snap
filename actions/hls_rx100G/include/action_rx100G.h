@@ -1,5 +1,5 @@
 #ifndef __ACTION_RX100G_H__
-#define __ACTION_RX10G_H__
+#define __ACTION_RX100G_H__
 
 /*
  * Copyright 2017 International Business Machines
