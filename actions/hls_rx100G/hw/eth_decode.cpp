@@ -173,7 +173,7 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 			decode_eth_2(packet_in.data, header);
 			packet_out.frame_number = header.jf_frame_number;
 			packet_out.eth_packet = header.jf_packet_number;
-			packet_out.module = header.src_mac % NMODULES;
+			packet_out.module = header.udp_dest_port % NMODULES;
 			packet_out.trigger = header.jf_debug[31];
 			packet_out.data(303,0) = packet_in.data(511, 208);
 			break;
