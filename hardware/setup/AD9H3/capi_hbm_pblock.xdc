@@ -27,3 +27,7 @@ set_false_path -through [get_pins a0/hbm_top_wrapper_i/hbm_top_i/hbm/inst/ONE_ST
 set_false_path -through [get_pins a0/action_reset_n_*/*]
 set_false_path -through [get_pins a0/hbm_top_wrapper_i/hbm_top_i/hbm/inst/ONE_STACK.u_hbm_top/*/*/*reg*/*]
 
+# see Xilinx AR 72607
+set_property C_USER_SCAN_CHAIN 1 [get_debug_cores dbg_hub]
+connect_debug_port dbg_hub/clk [get_nets */APB_0_PCLK]
+

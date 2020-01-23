@@ -165,7 +165,7 @@ set_property -dict [list                               \
   CONFIG.USER_HBM_HEX_CP_RES_0 {0x00001300}            \
   CONFIG.USER_HBM_HEX_LOCK_FB_REF_DLY_0 {0x00000d0d}   \
   CONFIG.USER_HBM_HEX_FBDIV_CLKOUTDIV_0 {0x00000302}   \
-  CONFIG.USER_XSDB_INTF_EN {FALSE}                     \
+#  CONFIG.USER_XSDB_INTF_EN {FALSE}                     \
 ] $cell >> $log_file
   
 #===============================================================================
