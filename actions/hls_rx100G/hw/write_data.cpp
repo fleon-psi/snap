@@ -23,8 +23,6 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t in_gain_pedest
 	int counter_ok = 0;
 	int counter_wrong = 0;
 
-	ap_uint<16> frame_status[FRAME_STATUS_BUF_SIZE*NMODULES]; // number of OK ETH packets received for the frame
-	for (int i = 0; i < FRAME_STATUS_BUF_SIZE*NMODULES; i++) frame_status[i] = 0;
 	uint64_t head[NMODULES]; // number of the newest packet received for the frame
 
 	for (int i = 0; i < NMODULES; i++) head[i] = 0;
@@ -43,24 +41,30 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t in_gain_pedest
 			ap_uint<512> buffer[128];
 
 			uint64_t frame_number0 = packet_in.frame_number;
+			ap_uint<4> module0 = packet_in.module;
+			ap_uint<8> eth_packet0 = packet_in.eth_packet;
+
+			bool is_head = true;
 
 			if (packet_in.frame_number > head[packet_in.module]) {
+				for (int i = 0; i < NMODULES; i++)
+					if (head[i] >= packet_in.frame_number) is_head = false;
 				head[packet_in.module] = packet_in.frame_number;
 			}
 
-			ap_uint<1> axis_user;
+			ap_uint<1> last_axis_user;
 
 			for (int i = 0; i < 128; i++) {
-				axis_user = packet_in.axis_user; // relevant for the last packet
+				if (i == 127) last_axis_user = packet_in.axis_user; // relevant for the last packet
 				buffer[i] = packet_in.data;
 				in.read(packet_in);
 			}
 
 			memcpy(dout_gmem + out_frame_addr, buffer, 128*64);
 
-			if (((packet_in.axis_packet == 0) && (axis_user == 0)) || (packet_in.exit == 1)) {
+			if (((packet_in.axis_packet == 0) && (last_axis_user == 0)) || (packet_in.exit == 1)) {
 				counter_ok++;
-				frame_status[packet_in.module * FRAME_STATUS_BUF_SIZE + (packet_in.frame_number % FRAME_STATUS_BUF_SIZE)]++;
+				// frame_status[packet_in.module * FRAME_STATUS_BUF_SIZE + (packet_in.frame_number % FRAME_STATUS_BUF_SIZE)]++;
 			}
 
 			else counter_wrong++;
