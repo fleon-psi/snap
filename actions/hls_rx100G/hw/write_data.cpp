@@ -16,7 +16,7 @@
 
 #include "hw_action_rx100G.h"
 
-void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t out_frame_buffer_addr) {
+void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr, size_t out_frame_status_addr) {
 	data_packet_t packet_in;
 	in.read(packet_in);
 

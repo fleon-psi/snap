@@ -135,7 +135,7 @@ void data_pack(ap_uint<512> &out, ap_int<16> in[32]);
 void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_address);
 
 void read_eth_packet(AXI_STREAM &deth_in, DATA_STREAM &raw_out, eth_settings_t eth_settings, eth_stat_t &eth_stat);
-void write_data(DATA_STREAM &raw_in, snap_membus_t *dout_gmem, size_t out_frame_buffer_addr);
+void write_data(DATA_STREAM &raw_in, snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr, size_t out_frame_status_addr);
 
 void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 		packed_pedeG0_t &packed_pedeG0, ap_uint<512> packed_gainG0,
