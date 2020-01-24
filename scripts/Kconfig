@@ -405,6 +405,7 @@ choice
             This example is written in C and compiled with HLS
         select ENABLE_HLS_SUPPORT
         select ENABLE_ETHERNET
+        select ENABLE_HBM
         select DISABLE_SDRAM_AND_BRAM
         select DISABLE_NVME
 endchoice
