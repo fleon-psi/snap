@@ -128,6 +128,7 @@ void unpack_gainG0(ap_uint<512> in, gainG0_t outg[32]);
 void unpack_pedeG0RMS(ap_uint<512> in, pedeG0RMS_t[32]);
 void unpack_pedeG1G2(ap_uint<512> in, pedeG1G2_t outp[32]);
 void unpack_gainG1G2(ap_uint<512> in, gainG1G2_t outp[32]);
+void status_pack(ap_uint<512> &out, ap_uint<8> in[64]) ;
 
 void data_shuffle(ap_uint<512> &out, ap_int<16> in[32]);
 void data_pack(ap_uint<512> &out, ap_int<16> in[32]);
