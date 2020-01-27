@@ -25,7 +25,8 @@
 #include "hls_snap.H"
 #include "../include/action_rx100G.h" /* HelloWorld Job definition */
 
-#define PEDE_G0_PRECISION 22
+#define PEDE_G0_PRECISION 24
+#define PEDESTAL_WINDOW_SIZE 128
 
 //--------------------------------------------------------------------
 // 1: simplify the data casting style
@@ -137,6 +138,8 @@ void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_addres
 
 void read_eth_packet(AXI_STREAM &deth_in, DATA_STREAM &raw_out, eth_settings_t eth_settings, eth_stat_t &eth_stat);
 void write_data(DATA_STREAM &raw_in, snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr, size_t out_frame_status_addr);
+
+void pedestal_update(ap_uint<512> data_in, packed_pedeG0_t& packed_pede, ap_uint<32> &mask, ap_uint<2> exp_gain, uint64_t frame_number);
 
 void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 		packed_pedeG0_t &packed_pedeG0, ap_uint<512> packed_gainG0,

@@ -16,6 +16,29 @@
 
 #include "hw_action_rx100G.h"
 
+void pedestal_update(ap_uint<512> data_in, packed_pedeG0_t& packed_pede, ap_uint<32> &mask, ap_uint<2> exp_gain, uint64_t frame_number) {
+	pedeG0_t pedestal[32];
+	unpack_pedeG0(packed_pede, pedestal);
+	ap_uint<16> in_val[32];
+
+	Loop0: for (int i = 0; i < 512; i++) in_val[i/16][i%16] = data_in[i];
+
+	Loop1: for (int i = 0; i < 32; i++) {
+		ap_uint<2> gain = in_val[i](15,14);
+		if (gain != exp_gain) mask[i] = 1;
+		else {
+			pedeG0_t tmp = in_val[i](13,0);
+			if (frame_number < PEDESTAL_WINDOW_SIZE)
+				// Plain average
+				pedestal[i] += tmp / PEDESTAL_WINDOW_SIZE;
+			else
+				// Rolling average
+				pedestal[i] += (tmp - pedestal[i]) / PEDESTAL_WINDOW_SIZE;
+		}
+	}
+	pack_pedeG0(packed_pede, pedestal);
+}
+
 void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 		packed_pedeG0_t& packed_pedeG0, ap_uint<512> packed_pedeG0RMS, ap_uint<512> packed_gainG0,
 		ap_uint<512> packed_pedeG1, ap_uint<512> packed_gainG1,
@@ -58,7 +81,7 @@ void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 				ap_ufixed<24,14, SC_RND_CONV> val_pede;
 				val_pede = pedeG0[i];
 				if (adu - val_pede < pedeG0RMS[i]) {
-					val_pede = (127 * val_pede + adu) / 128;
+					val_pede += (adu - val_pede) / 128;
 					pedeG0[i] = val_pede;
 				}
 				val_diff = adu - val_pede;
@@ -94,7 +117,6 @@ void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 			}
 		}
 	}
-	packed_pedeG0_t retval;
 	pack_pedeG0(packed_pedeG0, pedeG0);
 	data_shuffle(data_out, out_val);
 }
