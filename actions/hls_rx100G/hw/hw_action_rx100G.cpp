@@ -80,7 +80,6 @@ void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
 		AXI_STREAM &din_eth,
 		AXI_STREAM &dout_eth,
-		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
 		action_RO_config_reg *Action_Config)
 {
