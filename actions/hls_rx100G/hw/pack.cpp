@@ -69,8 +69,9 @@ void data_shuffle(ap_uint<512> &out, ap_int<16> in[32]) {
 
 void data_pack(ap_uint<512> &out, ap_int<16> in[32]) {
 #pragma HLS PIPELINE
-	for (int i = 0; i < 512; i++)
-				out[i] = in[i/16][i%16];
+	for (int i = 0; i < 512; i++) out[i] = in[i/16][i%16];
 }
+
+
 
 

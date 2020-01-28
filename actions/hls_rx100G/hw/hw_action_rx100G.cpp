@@ -28,12 +28,12 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 	}
 }
 
-void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t &eth_stat, snap_membus_t *dout_gmem, size_t out_frame_buffer_addr) {
+void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t &eth_stat, snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr, size_t out_frame_status_addr) {
 #pragma HLS DATAFLOW
 	DATA_STREAM raw;
 #pragma HLS STREAM variable=raw depth=2048
 	read_eth_packet(din_eth, raw, eth_settings, eth_stat);
-	write_data(raw, dout_gmem, out_frame_buffer_addr);
+	write_data(raw, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr);
 }
 
 //----------------------------------------------------------------------
@@ -56,7 +56,9 @@ static int process_action(snap_membus_t *din_gmem,
 
 	send_gratious_arp(dout_eth, act_reg->Data.fpga_mac_addr, act_reg->Data.fpga_ipv4_addr);
 
+	size_t in_gain_pedestal_addr = act_reg->Data.in_gain_pedestal_data.addr >> ADDR_RIGHT_SHIFT;
 	size_t out_frame_buffer_addr = act_reg->Data.out_frame_buffer.addr >> ADDR_RIGHT_SHIFT;
+	size_t out_frame_status_addr = act_reg->Data.out_frame_status.addr >> ADDR_RIGHT_SHIFT;
 
 	uint64_t bytes_written = 0;
 
@@ -70,7 +72,7 @@ static int process_action(snap_membus_t *din_gmem,
 	eth_stats.good_packets = 0;
 	eth_stats.ignored_packets = 0;
 
-	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, out_frame_buffer_addr);
+	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr);
 
 	act_reg->Data.good_packets = eth_stats.good_packets;
 	act_reg->Data.bad_packets = eth_stats.bad_packets;
@@ -94,7 +96,6 @@ void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *d_hbm_p7,
 		AXI_STREAM &din_eth,
 		AXI_STREAM &dout_eth,
-		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg,
 		action_RO_config_reg *Action_Config)
 {
