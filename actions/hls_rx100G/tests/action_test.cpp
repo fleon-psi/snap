@@ -8,8 +8,11 @@
 #define MODULE 0
 
 void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
+		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7,
 		AXI_STREAM &din_eth, AXI_STREAM &dout_eth,
-		/* snap_membus_t *d_ddrmem, // CAN BE COMMENTED IF UNUSED */
 		action_reg *act_reg, action_RO_config_reg *Action_Config);
 
 // From snap_tools.h - see LICENSE there
@@ -93,6 +96,15 @@ int main(int argc, char *argv[]) {
 	snap_membus_t *din_gmem = 0;
 	snap_membus_t *dout_gmem = 0;
 
+	snap_membus_t *d_hbm_p0 = (snap_membus_t *) calloc(1024*1024*256, 1);
+	snap_membus_t *d_hbm_p1 = (snap_membus_t *) calloc(1024*1024*256, 1);
+	snap_membus_t *d_hbm_p2 = (snap_membus_t *) calloc(1024*1024*256, 1);
+	snap_membus_t *d_hbm_p3 = (snap_membus_t *) calloc(1024*1024*256, 1);
+	snap_membus_t *d_hbm_p4 = (snap_membus_t *) calloc(1024*1024*256, 1);
+	snap_membus_t *d_hbm_p5 = (snap_membus_t *) calloc(1024*1024*256, 1);
+	snap_membus_t *d_hbm_p6 = (snap_membus_t *) calloc(1024*1024*256, 1);
+	snap_membus_t *d_hbm_p7 = (snap_membus_t *) calloc(1024*1024*256, 1);
+
 	uint16_t *out_frame_buffer = (uint16_t *) snap_malloc(FRAME_BUF_SIZE*NMODULES*MODULE_COLS*MODULE_LINES*sizeof(uint16_t));
 	uint8_t *out_frame_buffer_status = (uint8_t *) snap_malloc((NMODULES*100000+64)*sizeof(uint8_t));
 
@@ -122,7 +134,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-    hls_action(din_gmem, dout_gmem, din_eth, dout_eth, &action_register, &Action_Config);
+    hls_action(din_gmem, dout_gmem, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, din_eth, dout_eth, &action_register, &Action_Config);
 
 	ap_axiu_for_eth packet_out;
 
@@ -148,8 +160,16 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-
+	free(d_hbm_p0);
+	free(d_hbm_p1);
+	free(d_hbm_p2);
+	free(d_hbm_p3);
+	free(d_hbm_p4);
+	free(d_hbm_p5);
+	free(d_hbm_p6);
+	free(d_hbm_p7);
 	free(frame);
+
     __hexdump(stdout, out_frame_buffer_status, 64);
 	printf("Good packets %d\n",action_register.Data.good_packets);
 	printf("Bad packets %d\n",action_register.Data.bad_packets);

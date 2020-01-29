@@ -137,12 +137,19 @@ void data_pack(ap_uint<512> &out, ap_int<16> in[32]);
 void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_address);
 
 void read_eth_packet(AXI_STREAM &deth_in, DATA_STREAM &raw_out, eth_settings_t eth_settings, eth_stat_t &eth_stat);
-void write_data(DATA_STREAM &raw_in, snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr, size_t out_frame_status_addr);
+
+void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
+		size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr,
+		size_t out_frame_status_addr,
+		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7);
 
 void pedestal_update(ap_uint<512> data_in, packed_pedeG0_t& packed_pede, ap_uint<32> &mask, ap_uint<2> exp_gain, uint64_t frame_number);
 
 void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
-		packed_pedeG0_t &packed_pedeG0, ap_uint<512> packed_gainG0,
+		packed_pedeG0_t& packed_pedeG0, ap_uint<512> packed_pedeG0RMS, ap_uint<512> packed_gainG0,
 		ap_uint<512> packed_pedeG1, ap_uint<512> packed_gainG1,
 		ap_uint<512> packed_pedeG2, ap_uint<512> packed_gainG2);
 

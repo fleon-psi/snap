@@ -19,8 +19,6 @@
 #include "ap_int.h"
 #include "hw_action_rx100G.h"
 
-
-
 inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 #pragma HLS UNROLL
 	for (int i = 0; i < 64; i++) {
@@ -28,12 +26,20 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 	}
 }
 
-void process_frames(AXI_STREAM &din_eth, eth_settings_t eth_settings, eth_stat_t &eth_stat, snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr, size_t out_frame_status_addr) {
+void process_frames(AXI_STREAM &din_eth,
+		eth_settings_t eth_settings, eth_stat_t &eth_stat,
+		snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr,
+		size_t out_frame_buffer_addr, size_t out_frame_status_addr,
+		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7) {
 #pragma HLS DATAFLOW
 	DATA_STREAM raw;
 #pragma HLS STREAM variable=raw depth=2048
 	read_eth_packet(din_eth, raw, eth_settings, eth_stat);
-	write_data(raw, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr);
+	write_data(raw, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr,
+			d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7);
 }
 
 //----------------------------------------------------------------------
@@ -72,7 +78,7 @@ static int process_action(snap_membus_t *din_gmem,
 	eth_stats.good_packets = 0;
 	eth_stats.ignored_packets = 0;
 
-	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr);
+	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7);
 
 	act_reg->Data.good_packets = eth_stats.good_packets;
 	act_reg->Data.bad_packets = eth_stats.bad_packets;
@@ -121,21 +127,21 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
 #pragma HLS INTERFACE m_axi port=d_hbm_p0 bundle=card_hbm_p0 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p1 bundle=card_hbm_p1 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p2 bundle=card_hbm_p2 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p3 bundle=card_hbm_p3 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p4 bundle=card_hbm_p4 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p5 bundle=card_hbm_p5 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p6 bundle=card_hbm_p6 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p7 bundle=card_hbm_p7 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64
+  max_read_burst_length=64  max_write_burst_length=64 latency=16
 
 
 #pragma HLS INTERFACE axis register off port=din_eth
