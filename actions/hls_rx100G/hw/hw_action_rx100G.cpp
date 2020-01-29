@@ -26,20 +26,35 @@ inline void mask_tkeep(ap_uint<512> &data, ap_uint<64> keep) {
 	}
 }
 
+void prepare_hbm(snap_membus_t *din_gmem, size_t in_gain_pedestal_addr,
+		snap_membus_t *d_hbm_p0,  snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2,  snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4,  snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6,  snap_membus_t *d_hbm_p7,
+		snap_membus_t *d_hbm_p8,  snap_membus_t *d_hbm_p9,
+		snap_membus_t *d_hbm_p10, snap_membus_t *d_hbm_p11) {
+	ap_uint<512> zero512 = 0;
+
+	for (int i = 0; i < NMODULES; i ++) {
+	}
+}
+
 void process_frames(AXI_STREAM &din_eth,
-		eth_settings_t eth_settings, eth_stat_t &eth_stat,
+		eth_settings_t eth_settings, eth_stat_t &eth_stat, writer_settings_t writer_settings,
 		snap_membus_t *dout_gmem, size_t in_gain_pedestal_addr,
 		size_t out_frame_buffer_addr, size_t out_frame_status_addr,
-		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
-		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
-		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
-		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7) {
+		snap_membus_t *d_hbm_p0,  snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2,  snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4,  snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6,  snap_membus_t *d_hbm_p7,
+		snap_membus_t *d_hbm_p8,  snap_membus_t *d_hbm_p9,
+		snap_membus_t *d_hbm_p10, snap_membus_t *d_hbm_p11) {
 #pragma HLS DATAFLOW
 	DATA_STREAM raw;
 #pragma HLS STREAM variable=raw depth=2048
 	read_eth_packet(din_eth, raw, eth_settings, eth_stat);
-	write_data(raw, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr,
-			d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7);
+	write_data(raw, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr, writer_settings,
+			d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, d_hbm_p8, d_hbm_p9, d_hbm_p10, d_hbm_p11);
 }
 
 //----------------------------------------------------------------------
@@ -47,16 +62,13 @@ void process_frames(AXI_STREAM &din_eth,
 //----------------------------------------------------------------------
 static int process_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
-		snap_membus_t *d_hbm_p0,
-		snap_membus_t *d_hbm_p1,
-		snap_membus_t *d_hbm_p2,
-		snap_membus_t *d_hbm_p3,
-		snap_membus_t *d_hbm_p4,
-		snap_membus_t *d_hbm_p5,
-		snap_membus_t *d_hbm_p6,
-		snap_membus_t *d_hbm_p7,
-		AXI_STREAM &din_eth,
-		AXI_STREAM &dout_eth,
+		snap_membus_t *d_hbm_p0,  snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2,  snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4,  snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6,  snap_membus_t *d_hbm_p7,
+		snap_membus_t *d_hbm_p8,  snap_membus_t *d_hbm_p9,
+		snap_membus_t *d_hbm_p10, snap_membus_t *d_hbm_p11,
+		AXI_STREAM &din_eth, AXI_STREAM &dout_eth,
 		action_reg *act_reg)
 {
 
@@ -78,7 +90,17 @@ static int process_action(snap_membus_t *din_gmem,
 	eth_stats.good_packets = 0;
 	eth_stats.ignored_packets = 0;
 
-	process_frames(din_eth, eth_settings, eth_stats, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7);
+	writer_settings_t writer_settings;
+	// Stupid rule for the moment.
+	if (act_reg->Data.pedestalG0_frames > 0) writer_settings.convert = true;
+	else writer_settings.convert = false;
+	writer_settings.pedestalG0 = act_reg->Data.pedestalG0_frames;
+	writer_settings.pedestalG1 = act_reg->Data.pedestalG1_frames;
+	writer_settings.pedestalG2 = act_reg->Data.pedestalG2_frames;
+	writer_settings.total_frames = act_reg->Data.packets_to_read / 128;
+
+	process_frames(din_eth, eth_settings, eth_stats, writer_settings, dout_gmem, in_gain_pedestal_addr, out_frame_buffer_addr, out_frame_status_addr,
+			d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, d_hbm_p8, d_hbm_p9, d_hbm_p10, d_hbm_p11);
 
 	act_reg->Data.good_packets = eth_stats.good_packets;
 	act_reg->Data.bad_packets = eth_stats.bad_packets;
@@ -92,14 +114,12 @@ static int process_action(snap_membus_t *din_gmem,
 //--- TOP LEVEL MODULE -------------------------------------------------
 void hls_action(snap_membus_t *din_gmem,
 		snap_membus_t *dout_gmem,
-		snap_membus_t *d_hbm_p0,
-		snap_membus_t *d_hbm_p1,
-		snap_membus_t *d_hbm_p2,
-		snap_membus_t *d_hbm_p3,
-		snap_membus_t *d_hbm_p4,
-		snap_membus_t *d_hbm_p5,
-		snap_membus_t *d_hbm_p6,
-		snap_membus_t *d_hbm_p7,
+		snap_membus_t *d_hbm_p0,  snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2,  snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4,  snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6,  snap_membus_t *d_hbm_p7,
+		snap_membus_t *d_hbm_p8,  snap_membus_t *d_hbm_p9,
+		snap_membus_t *d_hbm_p10, snap_membus_t *d_hbm_p11,
 		AXI_STREAM &din_eth,
 		AXI_STREAM &dout_eth,
 		action_reg *act_reg,
@@ -127,21 +147,29 @@ void hls_action(snap_membus_t *din_gmem,
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
 #pragma HLS INTERFACE m_axi port=d_hbm_p0 bundle=card_hbm_p0 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p1 bundle=card_hbm_p1 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p2 bundle=card_hbm_p2 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p3 bundle=card_hbm_p3 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p4 bundle=card_hbm_p4 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p5 bundle=card_hbm_p5 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p6 bundle=card_hbm_p6 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 #pragma HLS INTERFACE m_axi port=d_hbm_p7 bundle=card_hbm_p7 offset=slave depth=512 \
-  max_read_burst_length=64  max_write_burst_length=64 latency=16
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
+#pragma HLS INTERFACE m_axi port=d_hbm_p8 bundle=card_hbm_p8 offset=slave depth=512 \
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
+#pragma HLS INTERFACE m_axi port=d_hbm_p9 bundle=card_hbm_p9 offset=slave depth=512 \
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
+#pragma HLS INTERFACE m_axi port=d_hbm_p10 bundle=card_hbm_p10 offset=slave depth=512 \
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
+#pragma HLS INTERFACE m_axi port=d_hbm_p11 bundle=card_hbm_p11 offset=slave depth=512 \
+		max_read_burst_length=64  max_write_burst_length=64 latency=16
 
 
 #pragma HLS INTERFACE axis register off port=din_eth
@@ -162,7 +190,9 @@ void hls_action(snap_membus_t *din_gmem,
 	default:
 		/* process_action(din_gmem, dout_gmem, d_ddrmem, act_reg); */
 		// process_action(din_gmem, dout_gmem, din_eth, dout_eth, act_reg);
-		process_action(din_gmem, dout_gmem, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, din_eth, dout_eth, act_reg);
+		process_action(din_gmem, dout_gmem,
+				d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, d_hbm_p8, d_hbm_p9, d_hbm_p10, d_hbm_p11,
+				din_eth, dout_eth, act_reg);
 		break;
 	}
 }

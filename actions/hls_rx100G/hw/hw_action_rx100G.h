@@ -25,7 +25,7 @@
 #include "hls_snap.H"
 #include "../include/action_rx100G.h" /* HelloWorld Job definition */
 
-#define PEDE_G0_PRECISION 24
+#define PEDE_G0_PRECISION 23
 #define PEDESTAL_WINDOW_SIZE 128
 
 //--------------------------------------------------------------------
@@ -62,6 +62,16 @@ struct eth_stat_t {
 	uint64_t good_packets;
 	uint64_t bad_packets;
 	uint64_t ignored_packets;
+};
+
+struct writer_settings_t {
+	bool convert;
+	size_t pedestalG0;
+	size_t pedestalG1;
+	size_t pedestalG2;
+	size_t total_frames;
+	size_t ntrigger;
+	size_t save_frames_after_trigger;
 };
 
 struct data_packet_t {
@@ -138,13 +148,17 @@ void send_gratious_arp(AXI_STREAM &out, ap_uint<48> mac, ap_uint<32> ipv4_addres
 
 void read_eth_packet(AXI_STREAM &deth_in, DATA_STREAM &raw_out, eth_settings_t eth_settings, eth_stat_t &eth_stat);
 
+
+
 void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 		size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr,
-		size_t out_frame_status_addr,
-		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
-		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
-		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
-		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7);
+		size_t out_frame_status_addr, writer_settings_t writer_settings,
+		snap_membus_t *d_hbm_p0,  snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2,  snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4,  snap_membus_t *d_hbm_p5,
+		snap_membus_t *d_hbm_p6,  snap_membus_t *d_hbm_p7,
+		snap_membus_t *d_hbm_p8,  snap_membus_t *d_hbm_p9,
+        snap_membus_t *d_hbm_p10, snap_membus_t *d_hbm_p11);
 
 void pedestal_update(ap_uint<512> data_in, packed_pedeG0_t& packed_pede, ap_uint<32> &mask, ap_uint<2> exp_gain, uint64_t frame_number);
 

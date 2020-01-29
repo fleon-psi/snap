@@ -24,18 +24,26 @@ struct packet_counter_t
 	ap_uint<8> counter[64];
 };
 
+enum writer_state_t {WRT_CONVERT, WRT_PEDESTAL_G0, WRT_PEDESTAL_G1, WRT_PEDESTAL_G2, WRT_RAW};
+
+// TODO: Would be nice to split into subfunctions, but not simple
 void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 		size_t in_gain_pedestal_addr, size_t out_frame_buffer_addr,
-		size_t out_frame_status_addr,
+		size_t out_frame_status_addr, writer_settings_t writer_settings,
 		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
 		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
 		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
-		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7) {
+		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7,
+		snap_membus_t *d_hbm_p8,  snap_membus_t *d_hbm_p9,
+		snap_membus_t *d_hbm_p10, snap_membus_t *d_hbm_p11) {
 	data_packet_t packet_in;
 	in.read(packet_in);
 
 	int counter_ok = 0;
 	int counter_wrong = 0;
+	writer_state_t writer_state;
+	if (writer_settings.convert == true) writer_state = WRT_CONVERT;
+	else writer_state = WRT_RAW;
 
 	packed_pedeG0_t pedestal_G0[NPIXEL/32];
 #pragma HLS RESOURCE variable=pedestal_G0 core=RAM_1P_URAM
@@ -45,7 +53,6 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 
 	packet_counter_t packet_counter[STATUS_BUFFER_SIZE];
 	Initialize_status: for (int i = 0; i < STATUS_BUFFER_SIZE; i++) {
-#pragma HLS PIPELINE II=32
 		packet_counter[i].head = i*64;
 		for (int j = 0; j < 64; j++) {
 			packet_counter[i].counter[j] = 0;
@@ -60,15 +67,11 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 
 	while (packet_in.exit == 0) {
 		Loop_good_packet: while ((packet_in.exit == 0) && (packet_in.axis_packet == 0)) {
-			// TODO: accounting which packets were converted
 #pragma HLS PIPELINE II=130
 			size_t out_frame_addr = out_frame_buffer_addr +
-					       (packet_in.frame_number % FRAME_BUF_SIZE) * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
-							packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
-							packet_in.eth_packet * (4096/32);
-
-
-
+					(packet_in.frame_number % FRAME_BUF_SIZE) * (NMODULES * MODULE_COLS * MODULE_LINES / 32) +
+					packet_in.module * (MODULE_COLS * MODULE_LINES/32) +
+					packet_in.eth_packet * (4096/32);
 
 			// 1. Extract information about the frame
 			uint64_t frame_number0 = packet_in.frame_number;
@@ -87,7 +90,7 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 				head[packet_in.module] = packet_in.frame_number;
 
 				ap_uint<512> statistics;
-			    statistics(31,0) = counter_ok;
+				statistics(31,0) = counter_ok;
 				statistics(63,32) = counter_wrong;
 				statistics(127,64) = packet_in.frame_number;
 				for (int i = 0; i < NMODULES; i++) {
@@ -97,43 +100,121 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 
 			}
 
-			// 2. Load conversion constants
-			size_t offset = packet_in.module * (MODULE_COLS * MODULE_LINES/32) + packet_in.eth_packet * (4096/32);
-
-			ap_uint<512> packed_pedeG0RMS[128];
-#pragma HLS RESOURCE variable=packed_pede_G0RMS core=RAM_2P_URAM
-			ap_uint<512> packed_pedeG1[128];
-#pragma HLS RESOURCE variable=packed_pede_G1 core=RAM_2P_URAM
-			ap_uint<512> packed_pedeG2[128];
-#pragma HLS RESOURCE variable=packed_pede_G2 core=RAM_2P_URAM
-			ap_uint<512> packed_gainG0[128];
-#pragma HLS RESOURCE variable=packed_gain_G0 core=RAM_2P_URAM
-			ap_uint<512> packed_gainG1[128];
-#pragma HLS RESOURCE variable=packed_gain_G1 core=RAM_2P_URAM
-			ap_uint<512> packed_gainG2[128];
-#pragma HLS RESOURCE variable=packed_gain_G2 core=RAM_2P_URAM
-
-			memcpy(packed_pedeG1, d_hbm_p0+offset, 64*128);
-			memcpy(packed_pedeG2, d_hbm_p1+offset, 64*128);
-			memcpy(packed_gainG0, d_hbm_p2+offset, 64*128);
-			memcpy(packed_gainG1, d_hbm_p3+offset, 64*128);
-			memcpy(packed_gainG2, d_hbm_p4+offset, 64*128);
-			memcpy(packed_pedeG0RMS, d_hbm_p5+offset, 64*128);
-
-			// 3. Load frames and convert
 			ap_uint<1> last_axis_user;
+
 			ap_uint<512> buffer[128];
 #pragma HLS RESOURCE variable=buffer core=RAM_2P_URAM
-			for (int i = 0; i < 128; i++) {
-				if (i == 127) last_axis_user = packet_in.axis_user; // relevant for the last packet
 
-				convert_and_shuffle(packet_in.data, buffer[i], pedestal_G0[offset + i], packed_pedeG0RMS[i], packed_gainG0[i], packed_pedeG1[i], packed_gainG1[i], packed_pedeG2[i], packed_gainG2[i]);
+			switch (writer_state) {
+			case WRT_RAW:
+			{
+				// 3. Load frames
 
-				in.read(packet_in);
+
+				for (int i = 0; i < 128; i++) {
+					buffer[i] = packet_in.data;
+					in.read(packet_in);
+					if (i == 127) last_axis_user = packet_in.axis_user; // relevant for the last packet
+				}
+
+				// 4. Transfer data out
+				memcpy(dout_gmem + out_frame_addr, buffer, 128*64);
+
 			}
+			break;
+			case WRT_PEDESTAL_G0:
+			{
+				for (int i = 0; i < 128; i++) {
+					buffer[i] = packet_in.data;
+					in.read(packet_in);
+					if (i == 127) last_axis_user = packet_in.axis_user; // relevant for the last packet
+				}
+			}
+			break;
+			case WRT_PEDESTAL_G1:
+			{
+				for (int i = 0; i < 128; i++) {
+					buffer[i] = packet_in.data;
+					in.read(packet_in);
+					if (i == 127) last_axis_user = packet_in.axis_user; // relevant for the last packet
+				}
+			}
+			break;
 
-			// 4. Transfer data out
-			memcpy(dout_gmem + out_frame_addr, buffer, 128*64);
+			case WRT_PEDESTAL_G2:
+			{
+				for (int i = 0; i < 128; i++) {
+					buffer[i] = packet_in.data;
+					in.read(packet_in);
+					if (i == 127) last_axis_user = packet_in.axis_user; // relevant for the last packet
+				}
+			}
+			break;
+
+			case WRT_CONVERT:
+			{
+				// 2. Load conversion constants
+				size_t offset = packet_in.module * (MODULE_COLS * MODULE_LINES/32) + packet_in.eth_packet * (4096/32);
+
+				ap_uint<512> packed_pedeG0RMS_0[64];
+				ap_uint<512> packed_pedeG0RMS_1[64];
+
+				ap_uint<512> packed_pedeG1_0[64];
+				ap_uint<512> packed_pedeG1_1[64];
+				ap_uint<512> packed_pedeG2_0[64];
+				ap_uint<512> packed_pedeG2_1[64];
+
+				ap_uint<512> packed_gainG0_0[64];
+				ap_uint<512> packed_gainG0_1[64];
+				ap_uint<512> packed_gainG1_0[64];
+				ap_uint<512> packed_gainG1_1[64];
+				ap_uint<512> packed_gainG2_0[64];
+				ap_uint<512> packed_gainG2_1[64];
+
+#pragma HLS RESOURCE variable=packed_pede_G0RMS_0 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_pede_G0RMS_1 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_pede_G1_1 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_pede_G1_0 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_pede_G2_1 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_pede_G2_0 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_gain_G0_0 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_gain_G0_1 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_gain_G1_0 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_gain_G1_1 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_gain_G2_0 core=RAM_2P_URAM
+#pragma HLS RESOURCE variable=packed_gain_G2_1 core=RAM_2P_URAM
+
+				//TODO: The same for the remaining HBM2 interfaces:
+				memcpy(packed_gainG0_0,    d_hbm_p0+offset, 64*64);
+				memcpy(packed_gainG0_1,    d_hbm_p1+offset, 64*64);
+				memcpy(packed_gainG1_0,    d_hbm_p2+offset, 64*64);
+				memcpy(packed_gainG1_1,    d_hbm_p3+offset, 64*64);
+				memcpy(packed_gainG2_0,    d_hbm_p4+offset, 64*64);
+				memcpy(packed_gainG2_1,    d_hbm_p5+offset, 64*64);
+
+				memcpy(packed_pedeG0RMS_0, d_hbm_p6+offset, 64*64);
+				memcpy(packed_pedeG0RMS_1, d_hbm_p7+offset, 64*64);
+				memcpy(packed_pedeG1_0,    d_hbm_p8+offset, 64*64);
+				memcpy(packed_pedeG1_1,    d_hbm_p9+offset, 64*64);
+				memcpy(packed_pedeG2_0,    d_hbm_p10+offset, 64*64);
+				memcpy(packed_pedeG2_1,    d_hbm_p11+offset, 64*64);
+
+				// 3. Load frames and convert
+
+				for (int i = 0; i < 64; i++) {
+					convert_and_shuffle(packet_in.data, buffer[2*i], pedestal_G0[offset + 2*i], packed_pedeG0RMS_0[i], packed_gainG0_0[i], packed_pedeG1_0[i], packed_gainG1_0[i], packed_pedeG2_0[i], packed_gainG2_0[i]);
+					in.read(packet_in);
+
+					if (i == 63) last_axis_user = packet_in.axis_user; // relevant for the last packet
+					convert_and_shuffle(packet_in.data, buffer[2*i+1], pedestal_G0[offset + 2*i+1], packed_pedeG0RMS_1[i], packed_gainG0_1[i], packed_pedeG1_1[i], packed_gainG1_1[i], packed_pedeG2_1[i], packed_gainG2_1[i]);
+					in.read(packet_in);
+				}
+
+				// 4. Transfer data out
+				memcpy(dout_gmem + out_frame_addr, buffer, 128*64);
+			}
+			break;
+			}
 
 			// 5. Calculate statistics and transfer them to host memory
 
@@ -164,7 +245,6 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 
 	// Save statistics that are in the packet_counter
 	Save_remainder: for (int i = 0; i < STATUS_BUFFER_SIZE; i++) {
-#pragma HLS PIPELINE II=32
 		ap_uint<512> tmp;
 		for (int j = 0; j < 512; j++) tmp[j] = packet_counter[i].counter[j/8][j%8];
 		memcpy(dout_gmem + out_frame_status_addr + 1 + (packet_counter[i].head * NMODULES / 64), &tmp, 64);
