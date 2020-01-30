@@ -1,7 +1,24 @@
+#-----------------------------------------------------------
+#   
+# Copyright 2019, Paul Scherrer Institute
+#   
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#-----------------------------------------------------------
+
 set root_dir        $::env(SNAP_HARDWARE_ROOT)
 set fpga_part       $::env(FPGACHIP)
 set ip_dir          $root_dir/ip
-#set action_root     $::env(ACTION_ROOT)
 
 set project_name "eth_100G"
 set project_dir [file dirname [file dirname [file normalize [info script]]]]
@@ -142,10 +159,16 @@ update_ip_catalog -rebuild -scan_changes
   connect_bd_intf_net -intf_net s_axis_tx_1 [get_bd_intf_ports s_axis_tx] [get_bd_intf_pins axis_clock_converter_tx_0/S_AXIS]
   connect_bd_net -net xlconstant_0_dout [get_bd_pins axis_clock_converter_tx_0/s_axis_aresetn] [get_bd_pins xlconstant_0/dout]
 
-assign_bd_address
-validate_bd_design
-make_wrapper -files [get_files $ip_dir/$project_name/${project_name}.srcs/sources_1/bd/${project_name}/${project_name}.bd] -top
-add_files -norecurse $ip_dir/$project_name/${project_name}.srcs/sources_1/bd/${project_name}/hdl/${project_name}_wrapper.v
+assign_bd_address 
+regenerate_bd_layout
+validate_bd_design 
+
 save_bd_design
+
+set_property synth_checkpoint_mode None [get_files $root_dir/ip/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd]
+generate_target all			[get_files $root_dir/ip/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd]
+
+make_wrapper -files [get_files $root_dir/ip/eth_100G/eth_100G.srcs/sources_1/bd/eth_100G/eth_100G.bd] -top
+
 close_project
 #exit
