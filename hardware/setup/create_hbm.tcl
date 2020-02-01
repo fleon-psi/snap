@@ -43,7 +43,7 @@ set bd_name  hbm_top
 #   --> follow HBM names <--
 # _______________________________________________________________________________
 #CHANGE_HBM_INTERFACES_NUMBER
-set  HBM_MEM_NUM 8
+set  HBM_MEM_NUM 6
 
 # Create HBM project
 create_project   $prj_name $root_dir/ip/hbm -part $fpga_part -force >> $log_file
@@ -197,9 +197,9 @@ set_property -dict [list \
   CONFIG.USER_MC_ENABLE_02 {TRUE}  \
   CONFIG.USER_SAXI_04 {true}  \
   CONFIG.USER_SAXI_05 {true}  \
-  CONFIG.USER_MC_ENABLE_03 {TRUE}  \
-  CONFIG.USER_SAXI_06 {true}  \
-  CONFIG.USER_SAXI_07 {true}  \
+  CONFIG.USER_MC_ENABLE_03 {FALSE}  \
+  CONFIG.USER_SAXI_06 {false}  \
+  CONFIG.USER_SAXI_07 {false}  \
   CONFIG.USER_MC_ENABLE_04 {FALSE}  \
   CONFIG.USER_MC_ENABLE_05 {FALSE}  \
   CONFIG.USER_MC_ENABLE_06 {FALSE}  \
@@ -217,7 +217,7 @@ connect_bd_net [get_bd_pins constant_1_zero/dout] [get_bd_pins hbm/APB_0_PWRITE]
 #connect_bd_net [get_bd_pins refclk_bufg_div3/BUFGCE_O] [get_bd_pins hbm/HBM_REF_CLK_0]
 connect_bd_net [get_bd_pins hbm/HBM_REF_CLK_0] [get_bd_pins refclk_ibufds_inst/IBUF_OUT]  
 connect_bd_net [get_bd_pins refclk_bufg_div4/BUFGCE_O] [get_bd_pins hbm/APB_0_PCLK]
-connect_bd_net [get_bd_pins ARESETN] [get_bd_pins hbm/APB_0_PRESET_N]
+#connect_bd_net [get_bd_pins ARESETN] [get_bd_pins hbm/APB_0_PRESET_N]
 
 #====================
 #
@@ -258,7 +258,7 @@ for {set i 0} {$i < $HBM_MEM_NUM} {incr i} {
   ] [get_bd_intf_ports S_AXI_p$i\_HBM]
   connect_bd_intf_net [get_bd_intf_ports S_AXI_p$i\_HBM] [get_bd_intf_pins axi_clock_converter_$i/S_AXI]
 
-  connect_bd_net [get_bd_pins ARESETN] [get_bd_pins axi_clock_converter_$i/m_axi_aresetn]
+  # connect_bd_net [get_bd_pins ARESETN] [get_bd_pins axi_clock_converter_$i/m_axi_aresetn]
   connect_bd_net [get_bd_pins ARESETN] [get_bd_pins axi_clock_converter_$i/s_axi_aresetn]
   
   if { ($vivadoVer >= "2019.2")} {
@@ -272,12 +272,12 @@ for {set i 0} {$i < $HBM_MEM_NUM} {incr i} {
   connect_bd_net [get_bd_pins axi_clock_converter_$i/m_axi_aclk] [get_bd_pins refclk_bufg_inst/BUFG_O]
 
   #connect axi_clock_converter to axi_512_to_256  
-  connect_bd_net [get_bd_pins ARESETN] [get_bd_pins axi_512_to_256_$i/s_axi_aresetn]
+  #connect_bd_net [get_bd_pins ARESETN] [get_bd_pins axi_512_to_256_$i/s_axi_aresetn]
   connect_bd_net [get_bd_pins refclk_bufg_inst/BUFG_O] [get_bd_pins axi_512_to_256_$i/s_axi_aclk]
   connect_bd_intf_net [get_bd_intf_pins axi_clock_converter_$i/M_AXI] [get_bd_intf_pins axi_512_to_256_$i/S_AXI]
 
   #connect axi_512_to_256 to axi4_to_axi3
-  connect_bd_net [get_bd_pins ARESETN] [get_bd_pins axi4_to_axi3_$i/aresetn]
+  #connect_bd_net [get_bd_pins ARESETN] [get_bd_pins axi4_to_axi3_$i/aresetn]
   connect_bd_net [get_bd_pins refclk_bufg_inst/BUFG_O] [get_bd_pins axi4_to_axi3_$i/aclk]
   connect_bd_intf_net [get_bd_intf_pins axi_512_to_256_$i/M_AXI] [get_bd_intf_pins axi4_to_axi3_$i/S_AXI]
   
@@ -285,11 +285,11 @@ for {set i 0} {$i < $HBM_MEM_NUM} {incr i} {
   #connect axi4_to_axi3 to hbm
   #Manage 1 vs 2 digits
   if { $i < 10} {
-    connect_bd_net [get_bd_pins ARESETN] [get_bd_pins hbm/AXI_0$i\_ARESET_N]
+    #connect_bd_net [get_bd_pins ARESETN] [get_bd_pins hbm/AXI_0$i\_ARESET_N]
     connect_bd_net [get_bd_pins refclk_bufg_inst/BUFG_O] [get_bd_pins hbm/AXI_0$i\_ACLK]
     connect_bd_intf_net [get_bd_intf_pins axi4_to_axi3_$i/M_AXI] [get_bd_intf_pins hbm/SAXI_0$i]
   } else {
-    connect_bd_net [get_bd_pins ARESETN] [get_bd_pins hbm/AXI_$i\_ARESET_N]
+    #connect_bd_net [get_bd_pins ARESETN] [get_bd_pins hbm/AXI_$i\_ARESET_N]
     connect_bd_net [get_bd_pins refclk_bufg_inst/BUFG_O] [get_bd_pins hbm/AXI_$i\_ACLK]
     connect_bd_intf_net [get_bd_intf_pins axi4_to_axi3_$i/M_AXI] [get_bd_intf_pins hbm/SAXI_$i]
   }
