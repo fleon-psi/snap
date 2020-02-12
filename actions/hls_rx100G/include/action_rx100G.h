@@ -40,18 +40,15 @@ extern "C" {
 /* Data structure used to exchange information between action and application */
 /* Size limit is 108 Bytes */
 typedef struct rx100G_job {
-	struct snap_addr in_gain_pedestal_data;
+    struct snap_addr in_gain_pedestal_data;
     struct snap_addr out_frame_buffer;
     struct snap_addr out_frame_status;
     uint64_t packets_to_read;
     uint64_t bad_packets;
-    uint64_t ignored_packets;
     uint64_t good_packets;
     uint64_t fpga_mac_addr;
     uint32_t fpga_ipv4_addr;
-    uint32_t pedestalG0_frames;
-    uint32_t pedestalG1_frames;
-    uint32_t pedestalG2_frames;
+    uint32_t save_raw;
 } rx100G_job_t;
 
 #ifdef __cplusplus

@@ -16,6 +16,25 @@
 
 #include "hw_action_rx100G.h"
 
+#define BLOCK_SIZE (NMODULES * 512 * 1024 / 32)
+
+inline void unpack_pedeG1G2(ap_uint<512> in, pedeG1G2_t outp[32]) {
+	for (int i = 0; i < 32; i ++) {
+		for (int j = 0; j < 16; j ++) {
+			outp[i][j] = in[i*16+j];
+		}
+	}
+}
+
+inline void unpack_gainG1G2(ap_uint<512> in, gainG1G2_t outg[32]) {
+	for (int i = 0; i < 32; i ++) {
+		for (int j = 0; j < 16; j ++) {
+			outg[i][j] = in[i*16+j];
+		}
+	}
+}
+
+
 void pedestal_update(ap_uint<512> data_in, packed_pedeG0_t& packed_pede, ap_uint<32> &mask, ap_uint<2> exp_gain, uint64_t frame_number) {
 	pedeG0_t pedestal[32];
 	unpack_pedeG0(packed_pede, pedestal);
@@ -38,6 +57,68 @@ void pedestal_update(ap_uint<512> data_in, packed_pedeG0_t& packed_pede, ap_uint
 	}
 	pack_pedeG0(packed_pede, pedestal);
 }
+
+
+
+void convert_data(DATA_STREAM &in, DATA_STREAM &out,
+		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
+		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
+		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
+		bool save_raw) {
+
+	data_packet_t packet_in, packet_out;
+	in.read(packet_in);
+	packed_pedeG0_t packed_pedeG0[NMODULES * 512 * 1024 / 32];
+#pragma HLS RESOURCE variable=packed_pedeG0 core=RAM_1P_URAM
+	//#pragma HLS ARRAY_PARTITION variable=packed_pedeG0 cyclic factor=8 dim=1
+
+	if (save_raw == 1) {
+		Just_forward: while (packet_in.exit != 1) {
+#pragma HLS pipeline
+			out.write(packet_in);
+			in.read(packet_in);
+		}
+	} else {
+		while (packet_in.exit != 1) {
+			Convert_and_forward: while ((packet_in.exit != 1) && (packet_in.axis_packet % 8 == 0)) {
+#pragma HLS pipeline II = 8
+				size_t offset = packet_in.module * 128 * 128 + 128 * packet_in.eth_packet + packet_in.axis_packet;
+				for (int i = 0; i < 8; i ++) {
+
+					ap_uint<512> packed_pedeG0RMS;
+					ap_uint<512> packed_pedeG1;
+					ap_uint<512> packed_pedeG2;
+					ap_uint<512> packed_gainG0;
+					ap_uint<512> packed_gainG1;
+					ap_uint<512> packed_gainG2;
+
+					memcpy(&packed_pedeG1, d_hbm_p0+offset+i, 64);
+					memcpy(&packed_pedeG2, d_hbm_p1+offset+i, 64);
+					memcpy(&packed_gainG0, d_hbm_p2+offset+i, 64);
+					memcpy(&packed_gainG1, d_hbm_p3+offset+i, 64);
+					memcpy(&packed_gainG2, d_hbm_p4+offset+i, 64);
+					memcpy(&packed_pedeG0RMS, d_hbm_p5+offset+i, 64);
+					convert_and_shuffle(packet_in.data, packet_out.data, packed_pedeG0[offset+i], packed_pedeG0RMS, packed_gainG0, packed_pedeG1, packed_gainG1, packed_pedeG2, packed_gainG2);
+
+					packet_out.exit = packet_in.exit;
+					packet_out.axis_packet = packet_in.axis_packet;
+					packet_out.eth_packet = packet_in.eth_packet;
+					packet_out.axis_user = packet_in.axis_user;
+					packet_out.frame_number = packet_in.frame_number;
+					packet_out.module = packet_in.module;
+					packet_out.trigger = packet_in.trigger;
+
+					in.read(packet_in);
+					out.write(packet_out);
+				}
+			}
+			while ((packet_in.exit != 1) && (packet_in.axis_packet % 8 != 0)) in.read(packet_in);
+		}
+	}
+
+	out.write(packet_in);
+}
+
 
 void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 		packed_pedeG0_t& packed_pedeG0, ap_uint<512> packed_pedeG0RMS, ap_uint<512> packed_gainG0,
@@ -117,6 +198,6 @@ void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512>& data_out,
 			}
 		}
 	}
-	pack_pedeG0(packed_pedeG0, pedeG0);
+	// pack_pedeG0(packed_pedeG0, pedeG0);
 	data_shuffle(data_out, out_val);
 }

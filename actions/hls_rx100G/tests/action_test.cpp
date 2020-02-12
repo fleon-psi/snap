@@ -11,7 +11,6 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
 		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
 		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
-		snap_membus_t *d_hbm_p6, snap_membus_t *d_hbm_p7,
 		AXI_STREAM &din_eth, AXI_STREAM &dout_eth,
 		action_reg *act_reg, action_RO_config_reg *Action_Config);
 
@@ -102,9 +101,8 @@ int main(int argc, char *argv[]) {
 	snap_membus_t *d_hbm_p3 = (snap_membus_t *) calloc(1024*1024*256, 1);
 	snap_membus_t *d_hbm_p4 = (snap_membus_t *) calloc(1024*1024*256, 1);
 	snap_membus_t *d_hbm_p5 = (snap_membus_t *) calloc(1024*1024*256, 1);
-	snap_membus_t *d_hbm_p6 = (snap_membus_t *) calloc(1024*1024*256, 1);
-	snap_membus_t *d_hbm_p7 = (snap_membus_t *) calloc(1024*1024*256, 1);
 
+    void* in_gain = snap_malloc(6*(NMODULES * 512 * 1024)*sizeof(uint16_t));
 	uint16_t *out_frame_buffer = (uint16_t *) snap_malloc(FRAME_BUF_SIZE*NMODULES*MODULE_COLS*MODULE_LINES*sizeof(uint16_t));
 	uint8_t *out_frame_buffer_status = (uint8_t *) snap_malloc((NMODULES*100000+64)*sizeof(uint8_t));
 
@@ -116,10 +114,13 @@ int main(int argc, char *argv[]) {
 
 	action_reg action_register;
 	action_RO_config_reg Action_Config;
+
 	action_register.Data.packets_to_read = NFRAMES * 128L;
+	action_register.Data.save_raw = 1;
 	action_register.Control.flags = 1;
 	action_register.Data.fpga_mac_addr = 0xAABBCCDDEEF1;
 	action_register.Data.fpga_ipv4_addr = 0x0A013205; // 10.1.50.5
+	action_register.Data.in_gain_pedestal_data.addr = (uint64_t) in_gain;
 	action_register.Data.out_frame_buffer.addr = (uint64_t) out_frame_buffer;
 	action_register.Data.out_frame_status.addr = (uint64_t) out_frame_buffer_status;
 
@@ -134,7 +135,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-    hls_action(din_gmem, dout_gmem, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, din_eth, dout_eth, &action_register, &Action_Config);
+    hls_action(din_gmem, dout_gmem, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, din_eth, dout_eth, &action_register, &Action_Config);
 
 	ap_axiu_for_eth packet_out;
 
@@ -166,14 +167,11 @@ int main(int argc, char *argv[]) {
 	free(d_hbm_p3);
 	free(d_hbm_p4);
 	free(d_hbm_p5);
-	free(d_hbm_p6);
-	free(d_hbm_p7);
 	free(frame);
 
     __hexdump(stdout, out_frame_buffer_status, 64);
 	printf("Good packets %d\n",action_register.Data.good_packets);
 	printf("Bad packets %d\n",action_register.Data.bad_packets);
-	printf("Ignored packets %d\n",action_register.Data.ignored_packets);
 
 	return retval;
 }
