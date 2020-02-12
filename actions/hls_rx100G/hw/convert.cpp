@@ -16,8 +16,6 @@
 
 #include "hw_action_rx100G.h"
 
-#define BLOCK_SIZE (NMODULES * 512 * 1024 / 32)
-
 inline void unpack_pedeG1G2(ap_uint<512> in, pedeG1G2_t outp[32]) {
 	for (int i = 0; i < 32; i ++) {
 		for (int j = 0; j < 16; j ++) {
@@ -58,17 +56,17 @@ void pedestal_update(ap_uint<512> data_in, packed_pedeG0_t& packed_pede, ap_uint
 	pack_pedeG0(packed_pede, pedestal);
 }
 
-
-
 void convert_data(DATA_STREAM &in, DATA_STREAM &out,
 		snap_membus_t *d_hbm_p0, snap_membus_t *d_hbm_p1,
 		snap_membus_t *d_hbm_p2, snap_membus_t *d_hbm_p3,
 		snap_membus_t *d_hbm_p4, snap_membus_t *d_hbm_p5,
+
 		bool save_raw) {
 
 	data_packet_t packet_in, packet_out;
 	in.read(packet_in);
 	packed_pedeG0_t packed_pedeG0[NMODULES * 512 * 1024 / 32];
+
 #pragma HLS RESOURCE variable=packed_pedeG0 core=RAM_1P_URAM
 	//#pragma HLS ARRAY_PARTITION variable=packed_pedeG0 cyclic factor=8 dim=1
 
