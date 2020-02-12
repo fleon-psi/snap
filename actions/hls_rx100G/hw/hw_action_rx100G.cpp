@@ -57,30 +57,6 @@ void process_frames(AXI_STREAM &din_eth,
 	write_data(converted, dout_gmem, out_frame_buffer_addr, out_frame_status_addr);
 }
 
-void process_frames_raw(AXI_STREAM &din_eth,
-		eth_settings_t eth_settings, eth_stat_t &eth_stat,
-		snap_membus_t *dout_gmem,
-		size_t out_frame_buffer_addr, size_t out_frame_status_addr) {
-#pragma HLS DATAFLOW
-	DATA_STREAM raw;
-//	DATA_STREAM raw_filtered;
-	DATA_STREAM converted;
-#pragma HLS STREAM variable=raw depth=1024
-#pragma HLS STREAM variable=converted depth=1024
-	read_eth_packet(din_eth, raw, eth_settings, eth_stat);
-
-	write_data(raw, dout_gmem, out_frame_buffer_addr, out_frame_status_addr);
-
-//	filter_packets(raw, raw_filtered);
-	convert_data(raw, converted,
-			d_hbm_p0, d_hbm_p1,
-			d_hbm_p2, d_hbm_p3,
-			d_hbm_p4, d_hbm_p5,
-			in_gain_pedestal_addr);
-	write_data(converted, dout_gmem, out_frame_buffer_addr, out_frame_status_addr);
->>>>>>> 601256738b15a8cfa870e7fc484c446fe4921f79
-}
-
 //----------------------------------------------------------------------
 //--- MAIN PROGRAM -----------------------------------------------------
 //----------------------------------------------------------------------
@@ -176,7 +152,6 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
 
 #pragma HLS INTERFACE m_axi port=d_hbm_p0 bundle=card_hbm_p0 offset=slave depth=512 \
-
 		max_read_burst_length=64  max_write_burst_length=64
 #pragma HLS INTERFACE m_axi port=d_hbm_p1 bundle=card_hbm_p1 offset=slave depth=512 \
 		max_read_burst_length=64  max_write_burst_length=64
