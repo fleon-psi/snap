@@ -44,7 +44,9 @@ static const char *mem_tab[] = { "HOST_DRAM", "CARD_DRAM", "TYPE_NVME" };
 static void snap_prepare_rx100G(struct snap_job *cjob,
 				 struct rx100G_job *mjob,                               
 				 void *addr_out,
-				 uint32_t size_out,
+                                 void *status_out,
+				 ssize_t size_out,
+                                 ssize_t size_status,
 				 uint8_t type_out)
 {
 	fprintf(stderr, "  prepare rx100G job of %ld bytes size\n", sizeof(*mjob));
@@ -53,13 +55,18 @@ static void snap_prepare_rx100G(struct snap_job *cjob,
 	memset(mjob, 0, sizeof(*mjob));
 
 	// Setting output params : where result will be written in host memory
-	snap_addr_set(&mjob->out, addr_out, size_out, type_out,
+	snap_addr_set(&mjob->out_frame_buffer, addr_out, size_out, type_out,
+		      SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
+		      SNAP_ADDRFLAG_END);
+
+	snap_addr_set(&mjob->out_frame_status, status_out, size_status, type_out,
 		      SNAP_ADDRFLAG_ADDR | SNAP_ADDRFLAG_DST |
 		      SNAP_ADDRFLAG_END);
 
 	mjob->packets_to_read = NPACKETS;
 	mjob->fpga_mac_addr = 0xAABBCCDDEEF1;
 	snap_job_set(cjob, mjob, sizeof(*mjob), NULL, 0);
+
 }
 
 /* main program of the application for the hls_helloworld example        */
@@ -78,10 +85,12 @@ int main()
 	unsigned long timeout = 600;
 	struct timeval etime, stime;
 	ssize_t size = NPACKETS * 400 * 64;
+        ssize_t status_size = NMODULES*NPACKETS+64;
 	uint8_t *obuff = NULL;
+        uint8_t *obuff_status = NULL;
 	uint8_t type_out = SNAP_ADDRTYPE_HOST_DRAM;
-
 	uint64_t addr_out = 0x0ull;
+        uint64_t status_out = 0x0ull;
 
 	int exit_code = EXIT_SUCCESS;
 
@@ -90,12 +99,14 @@ int main()
 
 	/* Allocate in host memory the place to put the text processed */
 	obuff = snap_malloc(size); //64Bytes aligned malloc
+	obuff_status = snap_malloc(status_size); //64Bytes aligned malloc
 	if (obuff == NULL) goto out_error;
 	memset(obuff, 0x0, size);
 
 	// prepare params to be written in MMIO registers for action
 	type_out = SNAP_ADDRTYPE_HOST_DRAM;
 	addr_out = (unsigned long)obuff;
+        status_out = (unsigned long) obuff_status;
 
 	/* Display the parameters that will be used for the example */
 	printf("PARAMETERS:\n"
@@ -123,10 +134,11 @@ int main()
 			card_no, strerror(errno));
 		goto out_error1;
 	}
- 
+
+
 	// Fill the stucture of data exchanged with the action
 	snap_prepare_rx100G(&cjob, &mjob,
-			     (void *)addr_out, size, type_out);
+			     (void *)addr_out, (void *) status_out, size,status_size, type_out);
 
 	// uncomment to dump the job structure
 	__hexdump(stderr, &mjob, sizeof(mjob));
@@ -150,14 +162,11 @@ int main()
 		goto out_error2;
 	}
         __hexdump(stdout, obuff, 130*64);
-
+        __hexdump(stdout, obuff_status, 8192);
 	__hexdump(stderr, &mjob, sizeof(mjob));
 
-	printf(" Loaded bytes %ld\n", mjob.read_size);
 	printf(" Good packets %ld\n", mjob.good_packets);
 	printf(" Bad packets %ld\n", mjob.bad_packets);
-	printf(" Ignored Packets %ld\n", mjob.ignored_packets);
-	printf(" User %lx\n", mjob.user);
 	printf(" MAC %lx\n", mjob.fpga_mac_addr);
 
 	// test return code
