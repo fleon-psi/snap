@@ -17,13 +17,13 @@
 
 int parse_input(int argc, char **argv) {
 	int opt;
-	receiver_settings.card_number = 1;
+	receiver_settings.card_number = 0;
 	receiver_settings.compression_threads = 2;
 	receiver_settings.ib_dev_name = "mlx5_0";
 	receiver_settings.fpga_mac_addr = 0xAABBCCDDEEF1;
 	receiver_settings.fpga_ip_addr = 0x0A013205;
 	receiver_settings.tcp_port = 52320;
-	receiver_settings.pedestal_file_name = "pedestal.dat";
+	receiver_settings.pedestal_file_name = "pedestal_card0.dat";
 
 	receiver_settings.gain_file_name[0] =
 			"/home/jungfrau/JF2M_X06SA_200310/gainMaps_M351_2020-01-20.bin";
@@ -39,6 +39,14 @@ int parse_input(int argc, char **argv) {
 		{
 		case 'C':
 			receiver_settings.card_number = atoi(optarg);
+                        //TODO: Only update if no values provided
+                        if  (receiver_settings.card_number == 1) {
+                           receiver_settings.ib_dev_name = "mlx5_2";
+                           receiver_settings.fpga_mac_addr = 0xAABBCCDDEEF2;
+                           receiver_settings.fpga_ip_addr = 0x0A013206;
+                           receiver_settings.tcp_port = 52321;
+			   receiver_settings.pedestal_file_name = "pedestal_card1.dat";
+                        }
 			break;
 		case 'T':
 			receiver_settings.compression_threads = atoi(optarg);
@@ -180,7 +188,24 @@ int TCP_server(uint16_t port) {
 	}
 
 	listen(sockfd, 1);
+        std::cout << "Listening on TCP/IP port " << port << std::endl;
 	return 0;
+}
+
+int TCP_exchange_magic_number() {
+    uint64_t magic_number = TCPIP_CONN_MAGIC_NUMBER;
+
+    // Send parameters
+    send(accepted_socket, &magic_number, sizeof(uint64_t), 0); 
+    // Receive parameters
+    read(accepted_socket, &magic_number, sizeof(uint64_t));
+
+    if (magic_number != TCPIP_CONN_MAGIC_NUMBER) {
+       std::cerr << "Mismatch in TCP/IP communication" << std::endl;
+       return 1;
+    }
+    std::cout << "TCP/IP magic number OK" << std::endl;
+    return 0;
 }
 
 int TCP_accept_connection() {
@@ -188,15 +213,7 @@ int TCP_accept_connection() {
 	// Accept TCP/IP connection
 	socklen_t addrlen = sizeof(client_address);
 	accepted_socket = accept(sockfd, (struct sockaddr *)&client_address, &addrlen);
-	uint64_t magic_number = TCPIP_CONN_MAGIC_NUMBER;
-
-	// Send parameters
-	send(accepted_socket, &magic_number, sizeof(uint64_t), 0);
-	// Receive parameters
-	read(accepted_socket, &magic_number, sizeof(uint64_t));
-
-	if (magic_number != TCPIP_CONN_MAGIC_NUMBER) return 1;
-	else return 0;
+	return TCP_exchange_magic_number();
 }
 
 void TCP_close_connection() {
@@ -215,34 +232,6 @@ void TCP_exchange_IB_parameters(ib_comm_settings_t *remote) {
 	// Receive parameters
 	read(accepted_socket, remote, sizeof(ib_comm_settings_t));
 }
-/*
-int save_images() {
-	if (conversion_mode == MODE_CONV) {
-		std::ofstream data_file("output_data.dat",std::ios::out | std::ios::binary);
-		data_file.write((char *) (frame_buffer + NPIXEL * online_statistics->trigger_position), nframes_to_write * NPIXEL * 2);
-		data_file.close();
-
-		int32_t *frame_sum = (int32_t *) calloc (NPIXEL, sizeof(int32_t));
-		for (uint64_t j = 0; j < nframes_to_write; j++) {
-			for (int i = 0; i < NPIXEL; i++) {
-				int16_t tmp = frame_buffer[NPIXEL * (online_statistics->trigger_position + (uint64_t)j) + (uint64_t)i];
-				if ((tmp < 30000) && (tmp > -30000)) frame_sum[i] += tmp;
-			}
-		}
-		std::ofstream sum_file("sum_data.dat",std::ios::out | std::ios::binary);
-		sum_file.write((char *) (frame_sum), NPIXEL * sizeof(int32_t));
-		sum_file.close();
-		free (frame_sum);
-	} else {
-		std::ofstream data_file("output_data.dat",std::ios::out | std::ios::binary);
-		data_file.write((char *) (frame_buffer), nframes_to_collect * NPIXEL * 2);
-		data_file.close();
-	}
-
-	std::ofstream status_file("status_data.dat",std::ios::out | std::ios::binary);
-	status_file.write((char *) status_buffer, status_buffer_size);
-	status_file.close();
-} */
 
 int main(int argc, char **argv) {
 	int ret;
@@ -256,12 +245,13 @@ int main(int argc, char **argv) {
 	if (allocate_memory() == 1) exit(EXIT_FAILURE);
 	std::cout << "Memory allocated" << std::endl;
 
-	// Load gain files (double, per module)
-	for (int i = 0; i < NMODULES; i++)
-		load_gain(receiver_settings.gain_file_name[i], i, experiment_settings.energy_in_keV);
-
 	// Load pedestal file
 	load_pedestal(receiver_settings.pedestal_file_name);
+
+        // Load test data
+        std::ifstream ifile("output_data_bshuf64.dat", std::ios::binary | std::ios::in);
+        ifile.read(ib_buffer, NPIXEL * sizeof(uint16_t) * 4000L);
+        ifile.close();
 
 	// Establish RDMA link
 	if (setup_ibverbs(ib_settings, receiver_settings.ib_dev_name.c_str(), RDMA_SQ_SIZE, 0) == 1) exit(EXIT_FAILURE);
@@ -275,68 +265,94 @@ int main(int argc, char **argv) {
 	}
 
 	// Connect to FPGA board
-	setup_snap(receiver_settings.card_number);
+	// setup_snap(receiver_settings.card_number);
 
 	// Establish TCP/IP server
 	if (TCP_server(receiver_settings.tcp_port) == 1) exit(EXIT_FAILURE);
 
-	// Accept TCP/IP communication
-	while (TCP_accept_connection() != 0)
+        while (1) {
+	   // Accept TCP/IP communication
+	   while (TCP_accept_connection() != 0)
 		std::cout << "Bogus TCP/IP connection" << std::endl;
 
-	// Exchange IB information
-	ib_comm_settings_t remote;
-	TCP_exchange_IB_parameters(&remote);
+	   // Receive experimental settings via TCP/IP
+	   read(accepted_socket, &experiment_settings, sizeof(experiment_settings_t));
+           if (experiment_settings.conversion_mode == 255) {
+              std::cout << "Exiting" << std::endl;
+              break;
+           }
 
-	// Switch to ready to send state for IB
-	if (switch_to_rtr(ib_settings, 0, remote.dlid, remote.qp_num) == 1) exit(EXIT_FAILURE);
-	std::cout << "IB Ready to receive" << std::endl;
-	if (switch_to_rts(ib_settings, RDMA_SQ_PSN) == 1) exit(EXIT_FAILURE);
-	std::cout << "IB Ready to send" << std::endl;
+	   // Exchange IB information
+	   ib_comm_settings_t remote;
+	   TCP_exchange_IB_parameters(&remote);
 
-	// Receive experimental settings via TCP/IP
-	read(accepted_socket, &experiment_settings, sizeof(experiment_settings_t));
+	   // Switch to ready to send state for IB
+	   if (switch_to_rtr(ib_settings, 0, remote.dlid, remote.qp_num) == 1) exit(EXIT_FAILURE);
+	   std::cout << "IB Ready to receive" << std::endl;
+	   if (switch_to_rts(ib_settings, RDMA_SQ_PSN) == 1) exit(EXIT_FAILURE);
+	   std::cout << "IB Ready to send" << std::endl;
 
-	// Start compression threads
-	pthread_t compressionThread[receiver_settings.compression_threads];
-	ThreadArg args[receiver_settings.compression_threads];
+           std::cout << "Energy: " << experiment_settings.energy_in_keV << " keV" << std::endl;
+           std::cout << "Frames to write : " << experiment_settings.nframes_to_write << std::endl;
 
-	for (int i = 0; i < receiver_settings.compression_threads ; i++) {
+           memset(ib_buffer_occupancy, 0, RDMA_SQ_SIZE * sizeof(uint16_t));
+           // TODO: Load gain before, only multiply by energy here
+	   // Load gain files (double, per module)
+	   for (int i = 0; i < NMODULES; i++)
+		load_gain(receiver_settings.gain_file_name[i], i, experiment_settings.energy_in_keV);
+
+           // Barrier
+           TCP_exchange_magic_number();
+
+	   // Start compression threads
+	   pthread_t compressionThread[receiver_settings.compression_threads];
+	   ThreadArg args[receiver_settings.compression_threads];
+
+	   for (int i = 0; i < receiver_settings.compression_threads ; i++) {
 		args[i].ThreadID = i;
 		ret = pthread_create(&compressionThread[i], NULL, send_thread, &args[i]);
 		PTHREAD_ERROR(ret,pthread_create);
-	}
+	   }
 
+	   pthread_t poll_cq_thread_1;
+	   ret = pthread_create(&poll_cq_thread_1, NULL, poll_cq_thread, NULL);
+	   PTHREAD_ERROR(ret, pthread_create);
 
-	pthread_t poll_cq_thread_1;
-	ret = pthread_create(&poll_cq_thread_1, NULL, poll_cq_thread, NULL);
-	PTHREAD_ERROR(ret, pthread_create);
+           for (int i = 0; i < NMODULES; i++)
+              online_statistics->head[i] = 5000;
+	   // Check for thread completion
+	   ret = pthread_join(poll_cq_thread_1, NULL);
+	   PTHREAD_ERROR(ret, pthread_join);
 
-	// Check for thread completion
-	ret = pthread_join(poll_cq_thread_1, NULL);
-	PTHREAD_ERROR(ret, pthread_join);
+	   // Start SNAP thread
+	   //pthread_t snapThread1;
+	   //ret = pthread_create(&snapThread1, NULL, snap_thread, NULL);
+	   //PTHREAD_ERROR(ret,pthread_create);
 
-	// Start SNAP thread
-	//pthread_t snapThread1;
-	//ret = pthread_create(&snapThread1, NULL, snap_thread, NULL);
-	//PTHREAD_ERROR(ret,pthread_create);
+	   // Check for threads completion
+	   //ret = pthread_join(snapThread1, NULL);
+	   //PTHREAD_ERROR(ret,pthread_join);
 
-	// Check for threads completion
-	//ret = pthread_join(snapThread1, NULL);
-	//PTHREAD_ERROR(ret,pthread_join);
-
-	for	(int i = 0; i <	receiver_settings.compression_threads ; i++) {
+	   for	(int i = 0; i <	receiver_settings.compression_threads ; i++) {
 		ret = pthread_join(compressionThread[i], NULL);
 		PTHREAD_ERROR(ret,pthread_join);
-	}
+	   }
 
-	// Acknowledge frames transferred
-	//uint64_t frames_written = experiment_settings.nframes_to_write;
-	//end(accepted_socket, &frames_written, sizeof(uint64_t), 0);
+	   // Send pedestal, header data and collection statistics
+	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
 
-	// Send pedestal, header data and collection statistics
-	send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
-	send(accepted_socket, &gain_pedestal_data, gain_pedestal_data_size, 0);
+           for (int i = 0; i < NPIXEL*6; i++)
+	      send(accepted_socket, gain_pedestal_data + i, sizeof(uint16_t), 0);
+
+           // Reset QP
+           switch_to_reset(ib_settings);
+           switch_to_init(ib_settings);
+
+           // Barrier
+           // Check magic number again
+           TCP_exchange_magic_number();
+           close(accepted_socket);
+        }
 
 	// Save pedestal
 	save_pedestal(receiver_settings.pedestal_file_name);
@@ -351,7 +367,7 @@ int main(int argc, char **argv) {
 	close_ibverbs(ib_settings);
 
 	// Close SNAP
-	close_snap();
+	// close_snap();
 
 	// Close TCP/IP socket
 	TCP_close_connection();

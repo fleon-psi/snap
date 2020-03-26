@@ -8,7 +8,7 @@
 #define RECEIVING_DELAY 5
 
 #define RDMA_SQ_PSN 532
-#define RDMA_SQ_SIZE 1024L // Maximum number of write elements
+#define RDMA_SQ_SIZE 64L // Maximum number of write elements
 
 #define PTHREAD_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
@@ -18,10 +18,10 @@ extern experiment_settings_t experiment_settings;
 
 // Settings only necessary for receiver
 struct receiver_settings_t {
-	uint32_t card_number;
+	int      card_number;
 	uint64_t fpga_mac_addr;
 	uint64_t fpga_ip_addr;
-	uint32_t compression_threads;
+	int      compression_threads;
 	uint16_t tcp_port;
 	std::string gain_file_name[NMODULES];
 	std::string pedestal_file_name;
