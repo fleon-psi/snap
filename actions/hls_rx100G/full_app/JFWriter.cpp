@@ -1,10 +1,12 @@
 #include <cstdlib>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <algorithm>
 #include <hdf5.h>
+#include <chrono>
 
 #include <endian.h>
 #include <unistd.h>
@@ -30,6 +32,28 @@ uint8_t writers_done_per_file;
 pthread_mutex_t writers_done_per_file_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t writers_done_per_file_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// Taken from bshuf
+/* Write a 64 bit unsigned integer to a buffer in big endian order. */
+void bshuf_write_uint64_BE(void* buf, uint64_t num) {
+    int ii;
+    uint8_t* b = (uint8_t*) buf;
+    uint64_t pow28 = 1 << 8;
+    for (ii = 7; ii >= 0; ii--) {
+        b[ii] = num % pow28;
+        num = num / pow28;
+    }
+}
+/* Write a 32 bit unsigned integer to a buffer in big endian order. */
+void bshuf_write_uint32_BE(void* buf, uint32_t num) {
+    int ii;
+    uint8_t* b = (uint8_t*) buf;
+    uint32_t pow28 = 1 << 8;
+    for (ii = 3; ii >= 0; ii--) {
+        b[ii] = num % pow28;
+        num = num / pow28;
+    }
+}
 
 int addStringAttribute(hid_t location, std::string name, std::string val) {
 	/* https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_attribute.c */
@@ -63,7 +87,7 @@ int open_HDF5_file(uint32_t file_id) {
 	char buff[12];
 	snprintf(buff,12,"data_%06d", file_id+1);
 	std::string filename = writer_settings.HDF5_prefix+"_"+std::string(buff)+".h5";
-
+        
 	// Create data file
 	data_file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 	if (data_file < 0) {
@@ -134,16 +158,15 @@ void close_HDF5_file() {
 int exchange_magic_number(int sockfd) {
 	uint64_t magic_number;
 
-	// Receive parameters
+	// Receive magic number
 	read(sockfd, &magic_number, sizeof(uint64_t));
+        // Reply with whatever was received
+        send(sockfd, &magic_number, sizeof(uint64_t), 0);
 	if (magic_number != TCPIP_CONN_MAGIC_NUMBER) {
-		std::cerr << "Mismatch in TCP/IP communication" << std::endl;
+		std::cerr << "Mismatch in TCP/IP communication" << std::endl;                
 		return 1;
 	}
-
-	magic_number = TCPIP_CONN_MAGIC_NUMBER;
-	// Send parameters
-	send(sockfd, &magic_number, sizeof(uint64_t), 0);
+        std::cout << "Magic number OK" << std::endl;
 	return 0;
 }
 
@@ -210,7 +233,7 @@ int parse_input(int argc, char **argv) {
 		writer_connection_settings[1].receiver_tcp_port = 52321;
 	}
 
-	while ((opt = getopt(argc,argv,":E:P:012BRc:w:f:i:h")) != EOF)
+	while ((opt = getopt(argc,argv,":E:P:012BRc:w:f:i:hx")) != EOF)
 		switch(opt)
 		{
 		case 'E':
@@ -230,6 +253,9 @@ int parse_input(int argc, char **argv) {
 			break;
 		case 'B':
 			experiment_settings.conversion_mode = MODE_CONV_BSHUF;
+			break;
+                case 'x':
+			experiment_settings.conversion_mode = 255;
 			break;
 		case 'c':
 			experiment_settings.nframes_to_collect = atoi(optarg);
@@ -251,7 +277,19 @@ int parse_input(int argc, char **argv) {
 	return 0;
 }
 
+int write_frame(char *data, size_t size, int frame_id, int thread_id) {
+    char buff[12];
+    snprintf(buff,12,"%08d_%01d", frame_id, thread_id);
+    std::string filename = writer_settings.HDF5_prefix+"_"+std::string(buff) + ".img";
+    std::ofstream out_file(filename.c_str(), std::ios::binary | std::ios::out);
+    if (!out_file.is_open()) return 1;
+    out_file.write(data,size);
+    out_file.close();
+    return 0;
+}
+
 void *writer_thread(void* threadArg) {
+        size_t total_compressed_size = 0;
 	int threadID = 0;
 	int sockfd;
 	ib_settings_t ib_settings;
@@ -259,6 +297,13 @@ void *writer_thread(void* threadArg) {
 			writer_connection_settings[threadID].receiver_tcp_port) == 1)
 		pthread_exit(0);
 
+	// Provide experiment settings to receiver
+	send(sockfd, &experiment_settings, sizeof(experiment_settings_t), 0);
+        if (experiment_settings.conversion_mode == 255) {
+            close(sockfd);
+            pthread_exit(0);
+        } 
+       
 	// Setup Infiniband connection
 	setup_ibverbs(ib_settings,
 			writer_connection_settings[threadID].ib_dev_name, 0, RDMA_RQ_SIZE);
@@ -266,9 +311,6 @@ void *writer_thread(void* threadArg) {
 	// Exchange information with remote host
 	ib_comm_settings_t remote;
 	TCP_exchange_IB_parameters(sockfd, ib_settings, &remote);
-
-	// Switch to ready to receive
-	switch_to_rtr(ib_settings, remote.rq_psn, remote.dlid, remote.qp_num);
 
 	// IB buffer
 	char *ib_buffer = (char *) calloc(RDMA_RQ_SIZE, RDMA_BUFFER_MAX_ELEM_SIZE);
@@ -278,7 +320,7 @@ void *writer_thread(void* threadArg) {
 		pthread_exit(0);
 	}
 	ibv_mr *ib_buffer_mr = ibv_reg_mr(ib_settings.pd,
-			ib_buffer, RDMA_RQ_SIZE * RDMA_BUFFER_MAX_ELEM_SIZE, 0);
+			ib_buffer, RDMA_RQ_SIZE * RDMA_BUFFER_MAX_ELEM_SIZE, IBV_ACCESS_LOCAL_WRITE);
 	if (ib_buffer_mr == NULL) {
 		std::cerr << "Failed to register IB memory region." << std::endl;
 		pthread_exit(0);
@@ -289,26 +331,32 @@ void *writer_thread(void* threadArg) {
 	struct ibv_sge ib_sg_entry;
 	struct ibv_recv_wr ib_wr, *ib_bad_recv_wr;
 
-	/* pointer to packet buffer size and memory key of each packet buffer */
+	// pointer to packet buffer size and memory key of each packet buffer
 	ib_sg_entry.length = RDMA_BUFFER_MAX_ELEM_SIZE;
 	ib_sg_entry.lkey = ib_buffer_mr->lkey;
 
+        std::cout << "Len: " << ib_sg_entry.length << std::endl;
 	ib_wr.num_sge = 1;
 	ib_wr.sg_list = &ib_sg_entry;
 	ib_wr.next = NULL;
 
 	for (size_t i = 0; (i < RDMA_RQ_SIZE) && (i < experiment_settings.nframes_to_write); i++)
 	{
-		ib_sg_entry.addr = (uint64_t)ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*i;
+		ib_sg_entry.addr = (uint64_t)(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*i+12);
 		ib_wr.wr_id = i;
 		ibv_post_recv(ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
-	}
+	} 
 
-	// Provide experiment settings to receiver
-	send(sockfd, &experiment_settings, sizeof(experiment_settings_t), 0);
+	// Switch to ready to receive
+	switch_to_rtr(ib_settings, remote.rq_psn, remote.dlid, remote.qp_num);
+        std::cout << "IB Ready to receive" << std::endl;
 
+        exchange_magic_number(sockfd);
+
+        auto start = std::chrono::system_clock::now();
 	// Receive data and write to HDF5 file
 	for (size_t frame = 0; frame < experiment_settings.nframes_to_write; frame ++) {
+                
 		// Poll CQ for finished receive requests
 		ibv_wc ib_wc;
 
@@ -325,57 +373,78 @@ void *writer_thread(void* threadArg) {
 				std::cerr << "Failed status " << ibv_wc_status_str(ib_wc.status) << " of IB Verbs send request #" << (int)ib_wc.wr_id << std::endl;
 				exit(EXIT_FAILURE);
 			}
-			usleep(1000);
+			usleep(100);
 		} while (num_comp == 0);
 
 		// Output is in ib_wc.wr_id - do something
 		// e.g. write with direct chunk writer
 		// TODO: Write to HDF5
 
-		pthread_mutex_lock(&hdf5_mutex);
+//                std::cout << "Received frame " << ntohl(ib_wc.imm_data) << std::endl;
+                uint32_t frame_id = ntohl(ib_wc.imm_data);
+                size_t   frame_size = ib_wc.byte_len;
+                bshuf_write_uint64_BE(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id, NPIXEL*2);
+		bshuf_write_uint32_BE(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id+8, 4096);
 
-		uint64_t *be_frame_number = (uint64_t *) (ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id);
-		uint32_t *be_compressed_size = (uint32_t *) (ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id + 8);
-		uint32_t compressed_size = be32toh(*be_compressed_size);
+		hsize_t offset[] = {frame_id, 514 * NMODULES * threadID,0};
 
-		hsize_t offset[] = {be64toh(*be_frame_number), 514 * NMODULES * threadID,0};
+                total_compressed_size += frame_size + 12;
+                write_frame(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id, frame_size+12, frame_id, threadID);
+//		pthread_mutex_lock(&hdf5_mutex);
 
-		//herr_t h5ret = H5Dwrite_chunk(data_dataset, H5P_DEFAULT, 0, offset, compressed_size,
-		//		ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id + 8);
+//		herr_t h5ret = H5Dwrite_chunk(data_dataset, H5P_DEFAULT, 0, offset, frame_size + 12,
+//				ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id);
+                
+//		pthread_mutex_unlock(&hdf5_mutex);
 
-
-		pthread_mutex_unlock(&hdf5_mutex);
-
+                // TODO: This might not be in order!...probably two files open make more sense
 		// Exchange file to write frames
-		if (frame % writer_settings.images_per_file ==
-				writer_settings.images_per_file - 1) {
-			pthread_mutex_lock(&writers_done_per_file_mutex);
-			writers_done_per_file--;
-			if (writers_done_per_file == 0) {
-				// Last part of the file finished - all the other threads are waiting on conditional below
-				close_HDF5_file();
-				open_HDF5_file(frame / writer_settings.images_per_file);
-				pthread_cond_broadcast(&writers_done_per_file_cond);
-				writers_done_per_file = NCARDS;
-			} else pthread_cond_wait(&writers_done_per_file_cond, &writers_done_per_file_mutex);
-			pthread_mutex_unlock(&writers_done_per_file_mutex);
-		}
+		//if (frame % writer_settings.images_per_file ==
+		//		writer_settings.images_per_file - 1) {
+		//	pthread_mutex_lock(&writers_done_per_file_mutex);
+		//	writers_done_per_file--;
+		//	if (writers_done_per_file == 0) {
+		//		// Last part of the file finished - all the other threads are waiting on conditional below
+		//		close_HDF5_file();
+		//		open_HDF5_file(frame / writer_settings.images_per_file);
+		//		pthread_cond_broadcast(&writers_done_per_file_cond);
+		//		writers_done_per_file = NCARDS;
+		//	} else pthread_cond_wait(&writers_done_per_file_cond, &writers_done_per_file_mutex);
+		//	pthread_mutex_unlock(&writers_done_per_file_mutex);
+		//}
 
 		// Post new WRs
 		if (experiment_settings.nframes_to_write - frame > RDMA_RQ_SIZE) {
 			// Make new work request with the same ID
 			// If there is need of new work request
-			ib_sg_entry.addr = (uint64_t)ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id;
+			ib_sg_entry.addr = (uint64_t)ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id + 12;
 			ib_wr.wr_id = ib_wc.wr_id;
 			ibv_post_recv(ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
 		}
 	}
+        auto end = std::chrono::system_clock::now();
 
+        std::chrono::duration<double> diff = end - start;
+
+        std::cout << "Throughput: " << (float) (experiment_settings.nframes_to_write) / diff.count() << " frames/s" << std::endl;
+        std::cout << "Compression ratio: " << ((double) total_compressed_size * 8) / ((double) NPIXEL * (double) experiment_settings.nframes_to_write) << " bits/pixel" <<std::endl; 
 	// Send pedestal, header data and collection statistics
 	read(sockfd, &(online_statistics[threadID]), sizeof(online_statistics_t));
-	read(sockfd, &(gain_pedestal[threadID]), NPIXEL * 6 * sizeof(uint16_t));
+        for (int i = 0; i < NPIXEL; i ++)
+	    read(sockfd, &(gain_pedestal[threadID].gainG0[i]), sizeof(uint16_t));
+        for (int i = 0; i < NPIXEL; i ++)
+	    read(sockfd, &(gain_pedestal[threadID].gainG1[i]), sizeof(uint16_t));
+        for (int i = 0; i < NPIXEL; i ++)
+	    read(sockfd, &(gain_pedestal[threadID].gainG2[i]), sizeof(uint16_t));
+        for (int i = 0; i < NPIXEL; i ++)
+	    read(sockfd, &(gain_pedestal[threadID].pedeG1[i]), sizeof(uint16_t));
+        for (int i = 0; i < NPIXEL; i ++)
+	    read(sockfd, &(gain_pedestal[threadID].pedeG2[i]), sizeof(uint16_t));
+        for (int i = 0; i < NPIXEL; i ++)
+	    read(sockfd, &(gain_pedestal[threadID].pedeG0[i]), sizeof(uint16_t));
 
-	if (exchange_magic_number(sockfd) == 1) exit(EXIT_FAILURE);
+        // Check magic number again - but don't quit, as the program is finishing anyway soon
+	exchange_magic_number(sockfd);
 
 	// Close IB connection
 	ibv_dereg_mr(ib_buffer_mr);
@@ -400,7 +469,8 @@ int main(int argc, char **argv) {
 	// Parse input
 	if (parse_input(argc, argv) == 1) exit(EXIT_FAILURE);
 
-	open_HDF5_file(0);
+        if (experiment_settings.nframes_to_write > 0)
+	    open_HDF5_file(0);
 
 	pthread_t writer[NCARDS];
 
@@ -411,5 +481,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < NCARDS; i++) {
 		ret = pthread_join(writer[i], NULL);
 	}
-	close_HDF5_file();
+
+        if (experiment_settings.nframes_to_write > 0)
+	    close_HDF5_file();
 }
