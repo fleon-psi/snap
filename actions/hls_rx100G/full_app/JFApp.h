@@ -47,6 +47,8 @@ struct ib_settings_t {
 
 // IB Verbs function wrappers
 int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t send_queue_size, size_t receive_queue_size);
+int switch_to_reset(ib_settings_t &settings);
+int switch_to_init(ib_settings_t &settings);
 int switch_to_rtr(ib_settings_t &settings, uint32_t rq_psn, uint16_t dlid, uint32_t dest_qp_num);
 int switch_to_rts(ib_settings_t &settings, uint32_t sq_psn);
 int close_ibverbs(ib_settings_t &settings);

@@ -56,7 +56,11 @@ int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t se
 		std::cerr << "Failed to create IB queue pair." << std::endl;
 		return 1;
 	}
+        if (switch_to_init(settings) == 1) return 1;
+	return 0;
+}
 
+int switch_to_init(ib_settings_t &settings) {
 	struct ibv_qp_attr qp_attr;
 	int qp_flags;
 
@@ -76,8 +80,28 @@ int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t se
 	}
 
 	ibv_query_port(settings.context, 1, &settings.port_attr);
-	
-	return 0;
+        return 0;
+}
+
+int switch_to_reset(ib_settings_t &settings) {
+	struct ibv_qp_attr qp_attr;
+	int qp_flags;
+
+	memset(&qp_attr, 0, sizeof(qp_attr));
+
+	qp_flags = IBV_QP_STATE;
+	qp_attr.qp_state = IBV_QPS_RESET;
+
+	int ret = ibv_modify_qp(settings.qp, &qp_attr, qp_flags);
+	if (ret < 0)
+	{
+		std::cerr << "Failed modify IB queue pair to reset." << std::endl;
+		return 1;
+	}
+
+	ibv_query_port(settings.context, 1, &settings.port_attr);
+        return 0;
+
 }
 
 int switch_to_rtr(ib_settings_t &settings, uint32_t rq_psn, uint16_t dlid, uint32_t dest_qp_num) {
