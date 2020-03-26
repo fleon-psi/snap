@@ -18,6 +18,10 @@ hid_t data_dcpl;
 struct writer_settings_t {
 	std::string HDF5_prefix;
 	int images_per_file;
+	int nthreads;
+	int nlocations;
+	std::string data_location[256];
+	std::string main_location;
 };
 extern writer_settings_t writer_settings;
 
@@ -27,20 +31,28 @@ struct writer_connection_settings_t {
 	uint16_t receiver_tcp_port; // Receiver TCP port
 	std::string ib_dev_name;    // IB device name
 	ib_settings_t ib_settings;  // IB settings
+	char *ib_buffer;            // IB buffer
+	ibv_mr *ib_buffer_mr;       // IB buffer memory region for Verbs
+};
+
+// Thread information
+struct writer_thread_arg_t {
+	uint16_t thread_id;
+	uint16_t card_id;
 };
 
 void *writer_thread(void* threadArg);
 
 struct gain_pedestal_t {
-	uint16_t gainG0[NPIXEL];
-	uint16_t gainG1[NPIXEL];
-	uint16_t gainG2[NPIXEL];
-	uint16_t pedeG1[NPIXEL];
-	uint16_t pedeG2[NPIXEL];
-	uint16_t pedeG0[NPIXEL];
+	uint16_t gainG0[NCARDS*NPIXEL];
+	uint16_t gainG1[NCARDS*NPIXEL];
+	uint16_t gainG2[NCARDS*NPIXEL];
+	uint16_t pedeG1[NCARDS*NPIXEL];
+	uint16_t pedeG2[NCARDS*NPIXEL];
+	uint16_t pedeG0[NCARDS*NPIXEL];
 };
 
-extern gain_pedestal_t gain_pedestal[NCARDS];
+extern gain_pedestal_t gain_pedestal;
 extern online_statistics_t online_statistics[NCARDS];
 
 extern experiment_settings_t experiment_settings;

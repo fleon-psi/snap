@@ -22,7 +22,7 @@ extern H5Z_class_t H5Z_JF[1];
 }
 
 writer_settings_t writer_settings;
-gain_pedestal_t gain_pedestal[NCARDS];
+gain_pedestal_t gain_pedestal;
 online_statistics_t online_statistics[NCARDS];
 
 experiment_settings_t experiment_settings;
@@ -33,26 +33,32 @@ pthread_mutex_t writers_done_per_file_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t writers_done_per_file_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+size_t total_compressed_size = 0;
+pthread_mutex_t total_compressed_size_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+uint64_t remaining_frames[NCARDS];
+pthread_mutex_t remaining_frames_mutex[NCARDS];
+
 // Taken from bshuf
 /* Write a 64 bit unsigned integer to a buffer in big endian order. */
 void bshuf_write_uint64_BE(void* buf, uint64_t num) {
-    int ii;
-    uint8_t* b = (uint8_t*) buf;
-    uint64_t pow28 = 1 << 8;
-    for (ii = 7; ii >= 0; ii--) {
-        b[ii] = num % pow28;
-        num = num / pow28;
-    }
+	int ii;
+	uint8_t* b = (uint8_t*) buf;
+	uint64_t pow28 = 1 << 8;
+	for (ii = 7; ii >= 0; ii--) {
+		b[ii] = num % pow28;
+		num = num / pow28;
+	}
 }
 /* Write a 32 bit unsigned integer to a buffer in big endian order. */
 void bshuf_write_uint32_BE(void* buf, uint32_t num) {
-    int ii;
-    uint8_t* b = (uint8_t*) buf;
-    uint32_t pow28 = 1 << 8;
-    for (ii = 3; ii >= 0; ii--) {
-        b[ii] = num % pow28;
-        num = num / pow28;
-    }
+	int ii;
+	uint8_t* b = (uint8_t*) buf;
+	uint32_t pow28 = 1 << 8;
+	for (ii = 3; ii >= 0; ii--) {
+		b[ii] = num % pow28;
+		num = num / pow28;
+	}
 }
 
 int addStringAttribute(hid_t location, std::string name, std::string val) {
@@ -68,13 +74,61 @@ int addStringAttribute(hid_t location, std::string name, std::string val) {
 	ret = H5Aclose(attr);
 
 	return 0;
+}
 
+int addDoubleAttribute(hid_t location, std::string name, const double *val, int dim) {
+    // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
+    hsize_t dims[1];
+    dims[0] = dim;
+
+    /* Create the data space for the dataset. */
+    hid_t dataspace_id = H5Screate_simple(1, dims, NULL);
+
+    hid_t attr = H5Acreate2(location, name.c_str(), H5T_IEEE_F64LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
+
+    herr_t ret = H5Awrite(attr, H5T_NATIVE_DOUBLE, val);
+
+    ret = H5Sclose(dataspace_id);
+    ret = H5Aclose(attr);
+
+    return 0;
 }
 
 hid_t createGroup(hid_t master_file_id, std::string group, std::string nxattr) {
 	hid_t group_id = H5Gcreate(master_file_id, group.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 	if (nxattr != "") addStringAttribute(group_id, "NX_class", nxattr);
 	return group_id;
+}
+
+int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim1, int dim2, int dim3, double multiplier) {
+    herr_t status;
+
+    // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
+    hsize_t dims[3];
+    dims[0] = dim1;
+    dims[1] = dim2;
+    dims[2] = dim3;
+
+    // Create the data space for the dataset.
+    hid_t dataspace_id = H5Screate_simple(3, dims, NULL);
+
+    // Create the dataset.
+    hid_t dataset_id = H5Dcreate2(location, name.c_str(), H5T_STD_U16LE, dataspace_id,
+                                  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+    // Write the dataset.
+    status = H5Dwrite(dataset_id, H5T_NATIVE_USHORT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                      val);
+
+    addDoubleAttribute(dataset_id, "multiplier", &multiplier, 1);
+
+    // End access to the dataset and release resources used by it.
+    status = H5Dclose(dataset_id);
+
+    // Terminate access to the data space.
+    status = H5Sclose(dataspace_id);
+
+    return 0;
 }
 
 int open_HDF5_file(uint32_t file_id) {
@@ -87,11 +141,12 @@ int open_HDF5_file(uint32_t file_id) {
 	char buff[12];
 	snprintf(buff,12,"data_%06d", file_id+1);
 	std::string filename = writer_settings.HDF5_prefix+"_"+std::string(buff)+".h5";
-        
+
 	// Create data file
 	data_file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 	if (data_file < 0) {
 		std::cerr << "HDF5 data file error" << std::endl;
+		return 1;
 	}
 
 	hid_t grp = createGroup(data_file, "/entry", "NXentry");
@@ -142,6 +197,39 @@ int open_HDF5_file(uint32_t file_id) {
 	return 0;
 }
 
+int save_gain_pedestal_hdf5() {
+	// Define filename
+	std::string filename = "";
+	if (writer_settings.main_location != "") filename =
+			writer_settings.main_location + "/" +
+			writer_settings.HDF5_prefix + "_calibration.h5";
+	else filename = writer_settings.HDF5_prefix + "_calibration.h5";
+
+	// Create data file
+	hid_t hdf5_file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	if (hdf5_file < 0) {
+		std::cerr << "Cannot create file: " << filename << std::endl;
+		return 1;
+	}
+	hid_t grp = createGroup(hdf5_file, "/entry", "NXentry");
+	H5Gclose(grp);
+
+	grp = createGroup(hdf5_file, "/entry/adu_to_photon","");
+	saveUInt16_3D(grp, "G0", gain_pedestal.gainG0, 1024, 512, NMODULES * NCARDS, 1.0/(16384.0*512.0));
+	saveUInt16_3D(grp, "G1", gain_pedestal.gainG1, 1024, 512, NMODULES * NCARDS, -1.0/8192);
+	saveUInt16_3D(grp, "G2", gain_pedestal.gainG2, 1024, 512, NMODULES * NCARDS, -1.0/8192);
+	H5Gclose(grp);
+
+	grp = createGroup(hdf5_file, "/entry/pedestal_in_adu","");
+	saveUInt16_3D(grp, "G0", gain_pedestal.pedeG0, 1024, 512, NMODULES * NCARDS, 0.25);
+	saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, 1024, 512, NMODULES * NCARDS, 0.25);
+	saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, 1024, 512, NMODULES * NCARDS, 0.25);
+	H5Gclose(grp);
+
+        H5Fclose(hdf5_file);
+	return 0;
+}
+
 void close_HDF5_file() {
 	H5Pclose (data_dcpl);
 
@@ -160,13 +248,13 @@ int exchange_magic_number(int sockfd) {
 
 	// Receive magic number
 	read(sockfd, &magic_number, sizeof(uint64_t));
-        // Reply with whatever was received
-        send(sockfd, &magic_number, sizeof(uint64_t), 0);
+	// Reply with whatever was received
+	send(sockfd, &magic_number, sizeof(uint64_t), 0);
 	if (magic_number != TCPIP_CONN_MAGIC_NUMBER) {
 		std::cerr << "Mismatch in TCP/IP communication" << std::endl;                
 		return 1;
 	}
-        std::cout << "Magic number OK" << std::endl;
+	std::cout << "Magic number OK" << std::endl;
 	return 0;
 }
 
@@ -219,8 +307,11 @@ int parse_input(int argc, char **argv) {
 	experiment_settings.nframes_to_collect = 16384;
 	experiment_settings.nframes_to_write   = 0;
 
+        writer_settings.main_location = "/mnt/zfs";
 	writer_settings.HDF5_prefix = "";
 	writer_settings.images_per_file = 1000;
+    writer_settings.nthreads = NCARDS;
+    writer_settings.nlocations = 0;
 
 	//These parameters are not changeable at the moment
 	writer_connection_settings[0].ib_dev_name = "mlx5_0";
@@ -233,7 +324,7 @@ int parse_input(int argc, char **argv) {
 		writer_connection_settings[1].receiver_tcp_port = 52321;
 	}
 
-	while ((opt = getopt(argc,argv,":E:P:012BRc:w:f:i:hx")) != EOF)
+	while ((opt = getopt(argc,argv,":E:P:012BRc:w:f:i:hxT:rs")) != EOF)
 		switch(opt)
 		{
 		case 'E':
@@ -254,7 +345,7 @@ int parse_input(int argc, char **argv) {
 		case 'B':
 			experiment_settings.conversion_mode = MODE_CONV_BSHUF;
 			break;
-                case 'x':
+		case 'x':
 			experiment_settings.conversion_mode = 255;
 			break;
 		case 'c':
@@ -269,6 +360,23 @@ int parse_input(int argc, char **argv) {
 		case 'i':
 			writer_settings.images_per_file = atoi(optarg);
 			break;
+		case 'T':
+			writer_settings.nthreads = atoi(optarg) * NCARDS;
+			break;
+		case 'r':
+			writer_settings.nlocations = 4;
+			writer_settings.data_location[0] = "/mnt/n0ram";
+			writer_settings.data_location[1] = "/mnt/n1ram";
+			writer_settings.data_location[2] = "/mnt/n2ram";
+			writer_settings.data_location[3] = "/mnt/n3ram";
+			break;
+		case 's':
+			writer_settings.nlocations = 4;
+			writer_settings.data_location[0] = "/mnt/n0ssd";
+			writer_settings.data_location[1] = "/mnt/n1ssd";
+			writer_settings.data_location[2] = "/mnt/n2ssd";
+			writer_settings.data_location[3] = "/mnt/n3ssd";
+			break;
 		case ':':
 			break;
 		case '?':
@@ -277,92 +385,54 @@ int parse_input(int argc, char **argv) {
 	return 0;
 }
 
+// Save image data "as is" binary
 int write_frame(char *data, size_t size, int frame_id, int thread_id) {
-    char buff[12];
-    snprintf(buff,12,"%08d_%01d", frame_id, thread_id);
-    std::string filename = writer_settings.HDF5_prefix+"_"+std::string(buff) + ".img";
-    std::ofstream out_file(filename.c_str(), std::ios::binary | std::ios::out);
-    if (!out_file.is_open()) return 1;
-    out_file.write(data,size);
-    out_file.close();
-    return 0;
+	char buff[12];
+	snprintf(buff,12,"%08d_%01d", frame_id, thread_id);
+	std::string prefix = "";
+	if (writer_settings.nlocations > 0)
+		prefix = writer_settings.data_location[frame_id % writer_settings.nlocations] + "/";
+	std::string filename = prefix + writer_settings.HDF5_prefix+"_"+std::string(buff) + ".img";
+	std::ofstream out_file(filename.c_str(), std::ios::binary | std::ios::out);
+	if (!out_file.is_open()) return 1;
+	out_file.write(data,size);
+	out_file.close();
+	return 0;
 }
 
-void *writer_thread(void* threadArg) {
-        size_t total_compressed_size = 0;
-	int threadID = 0;
-	int sockfd;
-	ib_settings_t ib_settings;
-	if (TCP_connect(sockfd, writer_connection_settings[threadID].receiver_host,
-			writer_connection_settings[threadID].receiver_tcp_port) == 1)
-		pthread_exit(0);
+void *writer_thread(void* thread_arg) {
+	writer_thread_arg_t *arg = (writer_thread_arg_t *)thread_arg;
+	int thread_id = arg->thread_id;
+	int card_id   = arg->card_id;
 
-	// Provide experiment settings to receiver
-	send(sockfd, &experiment_settings, sizeof(experiment_settings_t), 0);
-        if (experiment_settings.conversion_mode == 255) {
-            close(sockfd);
-            pthread_exit(0);
-        } 
-       
-	// Setup Infiniband connection
-	setup_ibverbs(ib_settings,
-			writer_connection_settings[threadID].ib_dev_name, 0, RDMA_RQ_SIZE);
-
-	// Exchange information with remote host
-	ib_comm_settings_t remote;
-	TCP_exchange_IB_parameters(sockfd, ib_settings, &remote);
-
-	// IB buffer
-	char *ib_buffer = (char *) calloc(RDMA_RQ_SIZE, RDMA_BUFFER_MAX_ELEM_SIZE);
-
-	if (ib_buffer == NULL) {
-		std::cerr << "Memory allocation error" << std::endl;
-		pthread_exit(0);
-	}
-	ibv_mr *ib_buffer_mr = ibv_reg_mr(ib_settings.pd,
-			ib_buffer, RDMA_RQ_SIZE * RDMA_BUFFER_MAX_ELEM_SIZE, IBV_ACCESS_LOCAL_WRITE);
-	if (ib_buffer_mr == NULL) {
-		std::cerr << "Failed to register IB memory region." << std::endl;
-		pthread_exit(0);
-	}
-
-	// Post WRs
+	// Work request
 	// Start receiving
 	struct ibv_sge ib_sg_entry;
 	struct ibv_recv_wr ib_wr, *ib_bad_recv_wr;
 
 	// pointer to packet buffer size and memory key of each packet buffer
 	ib_sg_entry.length = RDMA_BUFFER_MAX_ELEM_SIZE;
-	ib_sg_entry.lkey = ib_buffer_mr->lkey;
+	ib_sg_entry.lkey = writer_connection_settings[card_id].ib_buffer_mr->lkey;
 
-        std::cout << "Len: " << ib_sg_entry.length << std::endl;
 	ib_wr.num_sge = 1;
 	ib_wr.sg_list = &ib_sg_entry;
 	ib_wr.next = NULL;
 
-	for (size_t i = 0; (i < RDMA_RQ_SIZE) && (i < experiment_settings.nframes_to_write); i++)
-	{
-		ib_sg_entry.addr = (uint64_t)(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*i+12);
-		ib_wr.wr_id = i;
-		ibv_post_recv(ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
-	} 
+	// Lock is necessary for calculating loop condition
+	pthread_mutex_lock(&remaining_frames_mutex[card_id]);
+	// Receive data and write to file
+	while (remaining_frames[card_id] > 0) {
+		bool repost_wr = false;
+		if (remaining_frames[card_id] > RDMA_RQ_SIZE) repost_wr = true;
+		remaining_frames[card_id]--;
+		pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
 
-	// Switch to ready to receive
-	switch_to_rtr(ib_settings, remote.rq_psn, remote.dlid, remote.qp_num);
-        std::cout << "IB Ready to receive" << std::endl;
-
-        exchange_magic_number(sockfd);
-
-        auto start = std::chrono::system_clock::now();
-	// Receive data and write to HDF5 file
-	for (size_t frame = 0; frame < experiment_settings.nframes_to_write; frame ++) {
-                
 		// Poll CQ for finished receive requests
 		ibv_wc ib_wc;
 
 		int num_comp;
 		do {
-			num_comp = ibv_poll_cq(ib_settings.cq, 1, &ib_wc);
+			num_comp = ibv_poll_cq(writer_connection_settings[card_id].ib_settings.cq, 1, &ib_wc);
 
 			if (num_comp < 0) {
 				std::cerr << "Failed polling IB Verbs completion queue" << std::endl;
@@ -380,85 +450,147 @@ void *writer_thread(void* threadArg) {
 		// e.g. write with direct chunk writer
 		// TODO: Write to HDF5
 
-//                std::cout << "Received frame " << ntohl(ib_wc.imm_data) << std::endl;
-                uint32_t frame_id = ntohl(ib_wc.imm_data);
-                size_t   frame_size = ib_wc.byte_len;
-                bshuf_write_uint64_BE(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id, NPIXEL*2);
-		bshuf_write_uint32_BE(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id+8, 4096);
+		//                std::cout << "Received frame " << ntohl(ib_wc.imm_data) << std::endl;
+		uint32_t frame_id = ntohl(ib_wc.imm_data);
+		size_t   frame_size = ib_wc.byte_len;
+		char *ib_buffer_location = writer_connection_settings[card_id].ib_buffer
+				+ RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id;
 
-		hsize_t offset[] = {frame_id, 514 * NMODULES * threadID,0};
+		bshuf_write_uint64_BE(ib_buffer_location, NPIXEL*2);
+		bshuf_write_uint32_BE(ib_buffer_location + 8, 4096);
 
-                total_compressed_size += frame_size + 12;
-                write_frame(ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id, frame_size+12, frame_id, threadID);
-//		pthread_mutex_lock(&hdf5_mutex);
+		pthread_mutex_lock(&total_compressed_size_mutex);
+		total_compressed_size += frame_size + 12;
+		pthread_mutex_unlock(&total_compressed_size_mutex);
 
-//		herr_t h5ret = H5Dwrite_chunk(data_dataset, H5P_DEFAULT, 0, offset, frame_size + 12,
-//				ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id);
-                
-//		pthread_mutex_unlock(&hdf5_mutex);
-
-                // TODO: This might not be in order!...probably two files open make more sense
-		// Exchange file to write frames
-		//if (frame % writer_settings.images_per_file ==
-		//		writer_settings.images_per_file - 1) {
-		//	pthread_mutex_lock(&writers_done_per_file_mutex);
-		//	writers_done_per_file--;
-		//	if (writers_done_per_file == 0) {
-		//		// Last part of the file finished - all the other threads are waiting on conditional below
-		//		close_HDF5_file();
-		//		open_HDF5_file(frame / writer_settings.images_per_file);
-		//		pthread_cond_broadcast(&writers_done_per_file_cond);
-		//		writers_done_per_file = NCARDS;
-		//	} else pthread_cond_wait(&writers_done_per_file_cond, &writers_done_per_file_mutex);
-		//	pthread_mutex_unlock(&writers_done_per_file_mutex);
-		//}
+		write_frame(ib_buffer_location, frame_size+12, frame_id, card_id);
 
 		// Post new WRs
-		if (experiment_settings.nframes_to_write - frame > RDMA_RQ_SIZE) {
+		if (repost_wr) {
 			// Make new work request with the same ID
 			// If there is need of new work request
-			ib_sg_entry.addr = (uint64_t)ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id + 12;
+			ib_sg_entry.addr = (uint64_t)(ib_buffer_location + 12);
 			ib_wr.wr_id = ib_wc.wr_id;
-			ibv_post_recv(ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
+			ibv_post_recv(writer_connection_settings[card_id].ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
 		}
+		pthread_mutex_lock(&remaining_frames_mutex[card_id]);
 	}
-        auto end = std::chrono::system_clock::now();
-
-        std::chrono::duration<double> diff = end - start;
-
-        std::cout << "Throughput: " << (float) (experiment_settings.nframes_to_write) / diff.count() << " frames/s" << std::endl;
-        std::cout << "Compression ratio: " << ((double) total_compressed_size * 8) / ((double) NPIXEL * (double) experiment_settings.nframes_to_write) << " bits/pixel" <<std::endl; 
-	// Send pedestal, header data and collection statistics
-	read(sockfd, &(online_statistics[threadID]), sizeof(online_statistics_t));
-        for (int i = 0; i < NPIXEL; i ++)
-	    read(sockfd, &(gain_pedestal[threadID].gainG0[i]), sizeof(uint16_t));
-        for (int i = 0; i < NPIXEL; i ++)
-	    read(sockfd, &(gain_pedestal[threadID].gainG1[i]), sizeof(uint16_t));
-        for (int i = 0; i < NPIXEL; i ++)
-	    read(sockfd, &(gain_pedestal[threadID].gainG2[i]), sizeof(uint16_t));
-        for (int i = 0; i < NPIXEL; i ++)
-	    read(sockfd, &(gain_pedestal[threadID].pedeG1[i]), sizeof(uint16_t));
-        for (int i = 0; i < NPIXEL; i ++)
-	    read(sockfd, &(gain_pedestal[threadID].pedeG2[i]), sizeof(uint16_t));
-        for (int i = 0; i < NPIXEL; i ++)
-	    read(sockfd, &(gain_pedestal[threadID].pedeG0[i]), sizeof(uint16_t));
-
-        // Check magic number again - but don't quit, as the program is finishing anyway soon
-	exchange_magic_number(sockfd);
-
-	// Close IB connection
-	ibv_dereg_mr(ib_buffer_mr);
-	close_ibverbs(ib_settings);
-
-	// Free memory buffer
-	free(ib_buffer);
-
-	// Close TCP/IP socket
-	close(sockfd);
-
+	pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
 	pthread_exit(0);
 }
 
+int open_connection_card(int card_id) {
+	if (TCP_connect(writer_connection_settings[card_id].sockfd,
+			writer_connection_settings[card_id].receiver_host,
+			writer_connection_settings[card_id].receiver_tcp_port) == 1)
+		return 1;
+
+	// Provide experiment settings to receiver
+	send(writer_connection_settings[card_id].sockfd,
+			&experiment_settings, sizeof(experiment_settings_t), 0);
+	if (experiment_settings.conversion_mode == 255) {
+		close(writer_connection_settings[card_id].sockfd);
+		return 0;
+	}
+
+	// Setup Infiniband connection
+	setup_ibverbs(writer_connection_settings[card_id].ib_settings,
+			writer_connection_settings[card_id].ib_dev_name, 0, RDMA_RQ_SIZE);
+
+	// Exchange information with remote host
+	ib_comm_settings_t remote;
+	TCP_exchange_IB_parameters(writer_connection_settings[card_id].sockfd,
+			writer_connection_settings[card_id].ib_settings, &remote);
+
+	// IB buffer
+	writer_connection_settings[card_id].ib_buffer = (char *) calloc(RDMA_RQ_SIZE, RDMA_BUFFER_MAX_ELEM_SIZE);
+
+	if (writer_connection_settings[card_id].ib_buffer == NULL) {
+		std::cerr << "Memory allocation error" << std::endl;
+		return 1;
+	}
+	writer_connection_settings[card_id].ib_buffer_mr =
+			ibv_reg_mr(writer_connection_settings[card_id].ib_settings.pd,
+					writer_connection_settings[card_id].ib_buffer, 
+                                   RDMA_RQ_SIZE * RDMA_BUFFER_MAX_ELEM_SIZE, IBV_ACCESS_LOCAL_WRITE);
+	if (writer_connection_settings[card_id].ib_buffer_mr == NULL) {
+		std::cerr << "Failed to register IB memory region." << std::endl;
+		return 1;
+	}
+
+	// Post WRs
+	// Start receiving
+	struct ibv_sge ib_sg_entry;
+	struct ibv_recv_wr ib_wr, *ib_bad_recv_wr;
+
+	// pointer to packet buffer size and memory key of each packet buffer
+	ib_sg_entry.length = RDMA_BUFFER_MAX_ELEM_SIZE;
+	ib_sg_entry.lkey = writer_connection_settings[card_id].ib_buffer_mr->lkey;
+
+	ib_wr.num_sge = 1;
+	ib_wr.sg_list = &ib_sg_entry;
+	ib_wr.next = NULL;
+
+	for (size_t i = 0; (i < RDMA_RQ_SIZE) && (i < experiment_settings.nframes_to_write); i++)
+	{
+		ib_sg_entry.addr = (uint64_t)(writer_connection_settings[card_id].ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*i+12);
+		ib_wr.wr_id = i;
+		ibv_post_recv(writer_connection_settings[card_id].ib_settings.qp,
+				&ib_wr, &ib_bad_recv_wr);
+	}
+
+	// Switch to ready to receive
+	switch_to_rtr(writer_connection_settings[card_id].ib_settings,
+			remote.rq_psn, remote.dlid, remote.qp_num);
+	std::cout << "IB Ready to receive" << std::endl;
+
+	exchange_magic_number(writer_connection_settings[card_id].sockfd);
+	return 0;
+}
+
+int close_connection_card(int card_id) {
+        if (experiment_settings.conversion_mode == 255) {
+                close(writer_connection_settings[card_id].sockfd);
+                return 0;
+        }
+
+	// Send pedestal, header data and collection statistics
+	read(writer_connection_settings[card_id].sockfd,
+			&(online_statistics[card_id]), sizeof(online_statistics_t));
+	for (int i = 0; i < NPIXEL; i ++)
+		read(writer_connection_settings[card_id].sockfd,
+				&(gain_pedestal.gainG0[card_id*NPIXEL+i]), sizeof(uint16_t));
+	for (int i = 0; i < NPIXEL; i ++)
+		read(writer_connection_settings[card_id].sockfd,
+				&(gain_pedestal.gainG1[card_id*NPIXEL+i]), sizeof(uint16_t));
+	for (int i = 0; i < NPIXEL; i ++)
+		read(writer_connection_settings[card_id].sockfd,
+				&(gain_pedestal.gainG2[card_id*NPIXEL+i]), sizeof(uint16_t));
+	for (int i = 0; i < NPIXEL; i ++)
+		read(writer_connection_settings[card_id].sockfd,
+				&(gain_pedestal.pedeG1[card_id*NPIXEL+i]), sizeof(uint16_t));
+	for (int i = 0; i < NPIXEL; i ++)
+		read(writer_connection_settings[card_id].sockfd,
+				&(gain_pedestal.pedeG2[card_id*NPIXEL+i]), sizeof(uint16_t));
+	for (int i = 0; i < NPIXEL; i ++)
+		read(writer_connection_settings[card_id].sockfd,
+				&(gain_pedestal.pedeG0[card_id*NPIXEL+i]), sizeof(uint16_t));
+
+	// Check magic number again - but don't quit, as the program is finishing anyway soon
+	exchange_magic_number(writer_connection_settings[card_id].sockfd);
+
+	// Close IB connection
+	ibv_dereg_mr(writer_connection_settings[card_id].ib_buffer_mr);
+	close_ibverbs(writer_connection_settings[card_id].ib_settings);
+
+	// Free memory buffer
+	free(writer_connection_settings[card_id].ib_buffer);
+
+	// Close TCP/IP socket
+	close(writer_connection_settings[card_id].sockfd);
+
+	return 0;
+}
 
 int main(int argc, char **argv) {
 	int ret;
@@ -469,19 +601,43 @@ int main(int argc, char **argv) {
 	// Parse input
 	if (parse_input(argc, argv) == 1) exit(EXIT_FAILURE);
 
-        if (experiment_settings.nframes_to_write > 0)
-	    open_HDF5_file(0);
-
-	pthread_t writer[NCARDS];
-
 	for (int i = 0; i < NCARDS; i++) {
-		ret = pthread_create(&(writer[i]), NULL, writer_thread, NULL);
+		open_connection_card(i);
+		remaining_frames[i] = experiment_settings.nframes_to_write;
+		pthread_mutex_init(&(remaining_frames_mutex[i]), NULL);
 	}
 
-	for (int i = 0; i < NCARDS; i++) {
-		ret = pthread_join(writer[i], NULL);
+	pthread_t writer[writer_settings.nthreads];
+	writer_thread_arg_t writer_thread_arg[writer_settings.nthreads];
+
+	if (experiment_settings.nframes_to_write > 0) {
+		auto start = std::chrono::system_clock::now();
+
+		for (int i = 0; i < writer_settings.nthreads; i++) {
+			writer_thread_arg[i].thread_id = i / NCARDS;
+                        if (NCARDS > 1) 
+			    writer_thread_arg[i].card_id   = i % NCARDS;
+                        else
+                            writer_thread_arg[i].card_id = 0;
+			ret = pthread_create(&(writer[i]), NULL, writer_thread, &(writer_thread_arg[i]));
+		}
+                std::cout << "Threads started" << std::endl;
+		for (int i = 0; i < writer_settings.nthreads; i++) {
+			ret = pthread_join(writer[i], NULL);
+		}
+
+		auto end = std::chrono::system_clock::now();
+
+		std::chrono::duration<double> diff = end - start;
+
+		std::cout << "Throughput: " << (float) (experiment_settings.nframes_to_write) / diff.count() << " frames/s" << std::endl;
+		std::cout << "Compression ratio: " << ((double) total_compressed_size * 8) / ((double) NPIXEL * (double) experiment_settings.nframes_to_write) << " bits/pixel" <<std::endl;
 	}
 
-        if (experiment_settings.nframes_to_write > 0)
-	    close_HDF5_file();
+	for (int i = 0; i < NCARDS; i++)
+			close_connection_card(i);
+
+	// Only save pedestal and gain, if filename provided
+	if (writer_settings.HDF5_prefix != "")
+		save_gain_pedestal_hdf5();
 }
