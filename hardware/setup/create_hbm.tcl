@@ -243,7 +243,7 @@ if { $action_clock_freq == "225MHZ" } {
 #  CONFIG.USER_MC_ENABLE_00 {TRUE}    => enable/disable the MC
 #  CONFIG.USER_SAXI_00 {true}         => enable/disable each of the AXI interface/HBM memory
 set_property -dict [list \
-  CONFIG.USER_MEMORY_DISPLAY {2048}  \
+  CONFIG.USER_MEMORY_DISPLAY {3072}  \
   CONFIG.USER_CLK_SEL_LIST0 {AXI_00_ACLK}  \
   CONFIG.USER_MC_ENABLE_00 {TRUE}  \
   CONFIG.USER_MC_ENABLE_01 {TRUE}  \
