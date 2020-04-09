@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 Paul Scherrer Institute
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef _JFRECEIVER_H
 #define _JFRECEIVER_H
 
@@ -8,7 +24,7 @@
 #define RECEIVING_DELAY 5
 
 #define RDMA_SQ_PSN 532
-#define RDMA_SQ_SIZE 64L // Maximum number of write elements
+#define RDMA_SQ_SIZE 128L // Maximum number of write elements
 
 #define PTHREAD_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
@@ -28,8 +44,6 @@ struct receiver_settings_t {
 	std::string ib_dev_name;
 };
 extern receiver_settings_t receiver_settings;
-
-
 
 // Buffers for communication with the FPGA
 extern int16_t *frame_buffer;

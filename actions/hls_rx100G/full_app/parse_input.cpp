@@ -1,2 +1,0 @@
-#include "JFReceiver.h"
-

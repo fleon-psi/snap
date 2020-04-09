@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 Paul Scherrer Institute
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <cstdlib>
 #include <cstdio>
 #include <fstream>
@@ -16,6 +32,10 @@
 #include <netdb.h>
 
 #include "JFWriter.h"
+#include "bitshuffle/bitshuffle.h"
+
+#define LZ4_BLOCK_SIZE  0
+#define ZSTD_BLOCK_SIZE (8*514*1030)
 
 extern "C" {
 extern H5Z_class_t H5Z_JF[1];
@@ -39,26 +59,11 @@ pthread_mutex_t total_compressed_size_mutex = PTHREAD_MUTEX_INITIALIZER;
 uint64_t remaining_frames[NCARDS];
 pthread_mutex_t remaining_frames_mutex[NCARDS];
 
+
 // Taken from bshuf
-/* Write a 64 bit unsigned integer to a buffer in big endian order. */
-void bshuf_write_uint64_BE(void* buf, uint64_t num) {
-	int ii;
-	uint8_t* b = (uint8_t*) buf;
-	uint64_t pow28 = 1 << 8;
-	for (ii = 7; ii >= 0; ii--) {
-		b[ii] = num % pow28;
-		num = num / pow28;
-	}
-}
-/* Write a 32 bit unsigned integer to a buffer in big endian order. */
-void bshuf_write_uint32_BE(void* buf, uint32_t num) {
-	int ii;
-	uint8_t* b = (uint8_t*) buf;
-	uint32_t pow28 = 1 << 8;
-	for (ii = 3; ii >= 0; ii--) {
-		b[ii] = num % pow28;
-		num = num / pow28;
-	}
+extern "C" {
+    void bshuf_write_uint64_BE(void* buf, uint64_t num); 
+    void bshuf_write_uint32_BE(void* buf, uint32_t num);
 }
 
 int addStringAttribute(hid_t location, std::string name, std::string val) {
@@ -132,7 +137,6 @@ int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim
 }
 
 int open_HDF5_file(uint32_t file_id) {
-
 	int32_t frames = experiment_settings.nframes_to_write - writer_settings.images_per_file * file_id;
 	if (frames >  writer_settings.images_per_file) frames =  writer_settings.images_per_file;
 	if (frames <= 0) return 1;
@@ -306,12 +310,15 @@ int parse_input(int argc, char **argv) {
 	experiment_settings.conversion_mode    = MODE_CONV;
 	experiment_settings.nframes_to_collect = 16384;
 	experiment_settings.nframes_to_write   = 0;
+        experiment_settings.summation          = 1;
 
         writer_settings.main_location = "/mnt/zfs";
 	writer_settings.HDF5_prefix = "";
 	writer_settings.images_per_file = 1000;
-    writer_settings.nthreads = NCARDS;
-    writer_settings.nlocations = 0;
+        writer_settings.compression        = COMPRESSION_NONE;
+        
+        writer_settings.nthreads = NCARDS;
+        writer_settings.nlocations = 0;
 
 	//These parameters are not changeable at the moment
 	writer_connection_settings[0].ib_dev_name = "mlx5_0";
@@ -319,12 +326,12 @@ int parse_input(int argc, char **argv) {
 	writer_connection_settings[0].receiver_tcp_port = 52320;
 
 	if (NCARDS == 2) {
-		writer_connection_settings[1].ib_dev_name = "mlx5_2";
+		writer_connection_settings[1].ib_dev_name = "mlx5_12";
 		writer_connection_settings[1].receiver_host = "mx-ic922-1";
 		writer_connection_settings[1].receiver_tcp_port = 52321;
 	}
 
-	while ((opt = getopt(argc,argv,":E:P:012BRc:w:f:i:hxT:rs")) != EOF)
+	while ((opt = getopt(argc,argv,":E:P:012LZRc:w:f:i:hxT:rsS:R")) != EOF)
 		switch(opt)
 		{
 		case 'E':
@@ -342,8 +349,14 @@ int parse_input(int argc, char **argv) {
 		case '2':
 			experiment_settings.conversion_mode = MODE_PEDEG2;
 			break;
-		case 'B':
-			experiment_settings.conversion_mode = MODE_CONV_BSHUF;
+		case 'R':
+			experiment_settings.conversion_mode = MODE_RAW;
+			break;
+		case 'L':
+			writer_settings.compression = COMPRESSION_BSHUF_LZ4;
+			break;
+		case 'Z':
+			writer_settings.compression = COMPRESSION_BSHUF_ZSTD;
 			break;
 		case 'x':
 			experiment_settings.conversion_mode = 255;
@@ -359,6 +372,9 @@ int parse_input(int argc, char **argv) {
 			break;
 		case 'i':
 			writer_settings.images_per_file = atoi(optarg);
+			break;
+		case 'S':
+			experiment_settings.summation = atoi(optarg);
 			break;
 		case 'T':
 			writer_settings.nthreads = atoi(optarg) * NCARDS;
@@ -382,6 +398,17 @@ int parse_input(int argc, char **argv) {
 		case '?':
 			break;
 		}
+        if (experiment_settings.conversion_mode == MODE_RAW) {
+            writer_settings.compression = COMPRESSION_NONE; // Raw data are not well compressible
+            experiment_settings.summation = 1; // No summation possible
+        }
+        if ((experiment_settings.conversion_mode == MODE_PEDEG0) || 
+            (experiment_settings.conversion_mode == MODE_PEDEG1) ||
+            (experiment_settings.conversion_mode == MODE_PEDEG2)) {
+            experiment_settings.nframes_to_write = 0; // Don't write frames, when collecting pedestal
+            writer_settings.compression = COMPRESSION_NONE; // No compression allowed
+            experiment_settings.summation = 1; // No summation possible
+        }
 	return 0;
 }
 
@@ -400,85 +427,6 @@ int write_frame(char *data, size_t size, int frame_id, int thread_id) {
 	return 0;
 }
 
-void *writer_thread(void* thread_arg) {
-	writer_thread_arg_t *arg = (writer_thread_arg_t *)thread_arg;
-	int thread_id = arg->thread_id;
-	int card_id   = arg->card_id;
-
-	// Work request
-	// Start receiving
-	struct ibv_sge ib_sg_entry;
-	struct ibv_recv_wr ib_wr, *ib_bad_recv_wr;
-
-	// pointer to packet buffer size and memory key of each packet buffer
-	ib_sg_entry.length = RDMA_BUFFER_MAX_ELEM_SIZE;
-	ib_sg_entry.lkey = writer_connection_settings[card_id].ib_buffer_mr->lkey;
-
-	ib_wr.num_sge = 1;
-	ib_wr.sg_list = &ib_sg_entry;
-	ib_wr.next = NULL;
-
-	// Lock is necessary for calculating loop condition
-	pthread_mutex_lock(&remaining_frames_mutex[card_id]);
-	// Receive data and write to file
-	while (remaining_frames[card_id] > 0) {
-		bool repost_wr = false;
-		if (remaining_frames[card_id] > RDMA_RQ_SIZE) repost_wr = true;
-		remaining_frames[card_id]--;
-		pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
-
-		// Poll CQ for finished receive requests
-		ibv_wc ib_wc;
-
-		int num_comp;
-		do {
-			num_comp = ibv_poll_cq(writer_connection_settings[card_id].ib_settings.cq, 1, &ib_wc);
-
-			if (num_comp < 0) {
-				std::cerr << "Failed polling IB Verbs completion queue" << std::endl;
-				exit(EXIT_FAILURE);
-			}
-
-			if (ib_wc.status != IBV_WC_SUCCESS) {
-				std::cerr << "Failed status " << ibv_wc_status_str(ib_wc.status) << " of IB Verbs send request #" << (int)ib_wc.wr_id << std::endl;
-				exit(EXIT_FAILURE);
-			}
-			usleep(100);
-		} while (num_comp == 0);
-
-		// Output is in ib_wc.wr_id - do something
-		// e.g. write with direct chunk writer
-		// TODO: Write to HDF5
-
-		//                std::cout << "Received frame " << ntohl(ib_wc.imm_data) << std::endl;
-		uint32_t frame_id = ntohl(ib_wc.imm_data);
-		size_t   frame_size = ib_wc.byte_len;
-		char *ib_buffer_location = writer_connection_settings[card_id].ib_buffer
-				+ RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id;
-
-		bshuf_write_uint64_BE(ib_buffer_location, NPIXEL*2);
-		bshuf_write_uint32_BE(ib_buffer_location + 8, 4096);
-
-		pthread_mutex_lock(&total_compressed_size_mutex);
-		total_compressed_size += frame_size + 12;
-		pthread_mutex_unlock(&total_compressed_size_mutex);
-
-		write_frame(ib_buffer_location, frame_size+12, frame_id, card_id);
-
-		// Post new WRs
-		if (repost_wr) {
-			// Make new work request with the same ID
-			// If there is need of new work request
-			ib_sg_entry.addr = (uint64_t)(ib_buffer_location + 12);
-			ib_wr.wr_id = ib_wc.wr_id;
-			ibv_post_recv(writer_connection_settings[card_id].ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
-		}
-		pthread_mutex_lock(&remaining_frames_mutex[card_id]);
-	}
-	pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
-	pthread_exit(0);
-}
-
 int open_connection_card(int card_id) {
 	if (TCP_connect(writer_connection_settings[card_id].sockfd,
 			writer_connection_settings[card_id].receiver_host,
@@ -489,7 +437,6 @@ int open_connection_card(int card_id) {
 	send(writer_connection_settings[card_id].sockfd,
 			&experiment_settings, sizeof(experiment_settings_t), 0);
 	if (experiment_settings.conversion_mode == 255) {
-		close(writer_connection_settings[card_id].sockfd);
 		return 0;
 	}
 
@@ -533,7 +480,7 @@ int open_connection_card(int card_id) {
 
 	for (size_t i = 0; (i < RDMA_RQ_SIZE) && (i < experiment_settings.nframes_to_write); i++)
 	{
-		ib_sg_entry.addr = (uint64_t)(writer_connection_settings[card_id].ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*i+12);
+		ib_sg_entry.addr = (uint64_t)(writer_connection_settings[card_id].ib_buffer + RDMA_BUFFER_MAX_ELEM_SIZE*i);
 		ib_wr.wr_id = i;
 		ibv_post_recv(writer_connection_settings[card_id].ib_settings.qp,
 				&ib_wr, &ib_bad_recv_wr);
@@ -557,6 +504,7 @@ int close_connection_card(int card_id) {
 	// Send pedestal, header data and collection statistics
 	read(writer_connection_settings[card_id].sockfd,
 			&(online_statistics[card_id]), sizeof(online_statistics_t));
+
 	for (int i = 0; i < NPIXEL; i ++)
 		read(writer_connection_settings[card_id].sockfd,
 				&(gain_pedestal.gainG0[card_id*NPIXEL+i]), sizeof(uint16_t));
@@ -592,6 +540,115 @@ int close_connection_card(int card_id) {
 	return 0;
 }
 
+void *setup_thread(void* thread_arg) {
+	writer_thread_arg_t *arg = (writer_thread_arg_t *)thread_arg;
+	int card_id   = arg->card_id; 
+        open_connection_card(card_id);
+        pthread_exit(0);
+}
+
+void *writer_thread(void* thread_arg) {
+	writer_thread_arg_t *arg = (writer_thread_arg_t *)thread_arg;
+	int thread_id = arg->thread_id;
+	int card_id   = arg->card_id;
+
+	// Work request
+	// Start receiving
+	struct ibv_sge ib_sg_entry;
+	struct ibv_recv_wr ib_wr, *ib_bad_recv_wr;
+
+	// pointer to packet buffer size and memory key of each packet buffer
+	ib_sg_entry.length = RDMA_BUFFER_MAX_ELEM_SIZE;
+	ib_sg_entry.lkey   = writer_connection_settings[card_id].ib_buffer_mr->lkey;
+
+	ib_wr.num_sge = 1;
+	ib_wr.sg_list = &ib_sg_entry;
+	ib_wr.next = NULL;
+
+        // If no summation, one element is 16-bit, otherwise 32-bit
+        size_t elem_size;
+        if (experiment_settings.summation == 1) elem_size = 2;
+        else elem_size = 4;
+
+        // Create buffer to store compression settings
+        char *compression_buffer;
+        if (writer_settings.compression == COMPRESSION_BSHUF_LZ4)
+            compression_buffer = (char *) malloc(bshuf_compress_lz4_bound(514*1030*NMODULES, elem_size, LZ4_BLOCK_SIZE) + 12);
+        if (writer_settings.compression == COMPRESSION_BSHUF_ZSTD)
+            compression_buffer = (char *) malloc(bshuf_compress_zstd_bound(514*1030*NMODULES,elem_size, ZSTD_BLOCK_SIZE) + 12);
+
+	// Lock is necessary for calculating loop condition
+	pthread_mutex_lock(&remaining_frames_mutex[card_id]);
+	// Receive data and write to file
+	while (remaining_frames[card_id] > 0) {
+		bool repost_wr = false;
+		if (remaining_frames[card_id] > RDMA_RQ_SIZE) repost_wr = true;
+		remaining_frames[card_id]--;
+		pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
+
+		// Poll CQ for finished receive requests
+		ibv_wc ib_wc;
+
+		int num_comp;
+		do {
+			num_comp = ibv_poll_cq(writer_connection_settings[card_id].ib_settings.cq, 1, &ib_wc);
+
+			if (num_comp < 0) {
+				std::cerr << "Failed polling IB Verbs completion queue" << std::endl;
+				exit(EXIT_FAILURE);
+			}
+
+			if (ib_wc.status != IBV_WC_SUCCESS) {
+				std::cerr << "Failed status " << ibv_wc_status_str(ib_wc.status) << " of IB Verbs send request #" << (int)ib_wc.wr_id << std::endl;
+				exit(EXIT_FAILURE);
+			}
+			usleep(100);
+		} while (num_comp == 0);
+
+		uint32_t frame_id = ntohl(ib_wc.imm_data);
+		size_t   frame_size = ib_wc.byte_len;
+		char *ib_buffer_location = writer_connection_settings[card_id].ib_buffer
+				+ RDMA_BUFFER_MAX_ELEM_SIZE*ib_wc.wr_id;
+
+                switch(writer_settings.compression) {
+                    case COMPRESSION_NONE:
+		        write_frame(ib_buffer_location, frame_size, frame_id, card_id);
+                        break;
+
+                    case COMPRESSION_BSHUF_LZ4:
+		        bshuf_write_uint64_BE(compression_buffer, 514*1030*NMODULES * elem_size);
+		        bshuf_write_uint32_BE(compression_buffer + 8, LZ4_BLOCK_SIZE);
+                        frame_size = bshuf_compress_lz4(ib_buffer_location, compression_buffer + 12, 514*1030*NMODULES, elem_size, LZ4_BLOCK_SIZE) + 12;
+		        write_frame(compression_buffer, frame_size, frame_id, card_id);
+                        break;
+
+                    case COMPRESSION_BSHUF_ZSTD:
+		        bshuf_write_uint64_BE(compression_buffer, 514*1030*NMODULES * elem_size);
+		        bshuf_write_uint32_BE(compression_buffer + 8, ZSTD_BLOCK_SIZE);
+                        frame_size = bshuf_compress_zstd(ib_buffer_location, compression_buffer + 12, 514*1030*NMODULES, elem_size, ZSTD_BLOCK_SIZE) + 12;
+		        write_frame(compression_buffer, frame_size, frame_id, card_id);
+                        break;       
+                }
+
+		pthread_mutex_lock(&total_compressed_size_mutex);
+		total_compressed_size += frame_size;
+		pthread_mutex_unlock(&total_compressed_size_mutex);
+
+		// Post new WRs
+		if (repost_wr) {
+			// Make new work request with the same ID
+			// If there is need of new work request
+			ib_sg_entry.addr = (uint64_t)(ib_buffer_location);
+			ib_wr.wr_id = ib_wc.wr_id;
+			ibv_post_recv(writer_connection_settings[card_id].ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
+		}
+		pthread_mutex_lock(&remaining_frames_mutex[card_id]);
+	}
+	pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
+        free(compression_buffer);
+	pthread_exit(0);
+}
+
 int main(int argc, char **argv) {
 	int ret;
 
@@ -601,11 +658,21 @@ int main(int argc, char **argv) {
 	// Parse input
 	if (parse_input(argc, argv) == 1) exit(EXIT_FAILURE);
 
+        // Setup connections with two receivers in parallel doesn't work
+        // IB Verbs is theoretically thread-safe, but...
+//        pthread_t setup[NCARDS];
+//        writer_thread_arg_t setup_thread_arg[NCARDS]; 
 	for (int i = 0; i < NCARDS; i++) {
-		open_connection_card(i);
-		remaining_frames[i] = experiment_settings.nframes_to_write;
-		pthread_mutex_init(&(remaining_frames_mutex[i]), NULL);
+//            setup_thread_arg[i].card_id = i;
+//	    ret = pthread_create(&(setup[i]), NULL, setup_thread, &(setup_thread_arg[i]));
+            open_connection_card(i);
+	    remaining_frames[i] = experiment_settings.nframes_to_write;
+	    pthread_mutex_init(&(remaining_frames_mutex[i]), NULL);
 	}
+
+//	for (int i = 0; i < NCARDS; i++) {
+//            ret = pthread_join(setup[i], NULL);
+//        }
 
 	pthread_t writer[writer_settings.nthreads];
 	writer_thread_arg_t writer_thread_arg[writer_settings.nthreads];
@@ -631,7 +698,7 @@ int main(int argc, char **argv) {
 		std::chrono::duration<double> diff = end - start;
 
 		std::cout << "Throughput: " << (float) (experiment_settings.nframes_to_write) / diff.count() << " frames/s" << std::endl;
-		std::cout << "Compression ratio: " << ((double) total_compressed_size * 8) / ((double) NPIXEL * (double) experiment_settings.nframes_to_write) << " bits/pixel" <<std::endl;
+		std::cout << "Compression ratio: " << ((double) total_compressed_size * 8) / ((double) NPIXEL * (double) NCARDS * (double) experiment_settings.nframes_to_write) << " bits/pixel" <<std::endl;
 	}
 
 	for (int i = 0; i < NCARDS; i++)

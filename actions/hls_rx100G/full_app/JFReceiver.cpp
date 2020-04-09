@@ -77,7 +77,7 @@ int parse_input(int argc, char **argv) {
 }
 
 int allocate_memory() {
-	frame_buffer_size       = FRAME_BUF_SIZE * NPIXEL * 2; // can store FRAME_BUF_SIZE frames
+	frame_buffer_size       = FRAME_BUF_SIZE * NPIXEL * sizeof(int16_t); // can store FRAME_BUF_SIZE frames
 	status_buffer_size      = FRAME_LIMIT*NMODULES*128/8+64;   // can store 1 bit per each ETH packet expected
 	gain_pedestal_data_size = 6 * 2 * NPIXEL;  // each entry to in_parameters_array is 2 bytes and there are 6 constants per pixel
 	jf_packet_headers_size  = FRAME_LIMIT * NMODULES * sizeof(header_info_t);
@@ -119,7 +119,7 @@ void deallocate_memory() {
 }
 
 int load_bin_file(std::string fname, char *dest, size_t size) {
-	std::cout << "Loading " << fname.c_str() << std::endl;
+//	std::cout << "Loading " << fname.c_str() << std::endl;
 	std::fstream file10(fname.c_str(), std::fstream::in | std::fstream::binary);
 	if (!file10.is_open()) {
 		std::cerr << "Error opening file " << fname.c_str() << std::endl;
@@ -204,7 +204,6 @@ int TCP_exchange_magic_number() {
        std::cerr << "Mismatch in TCP/IP communication" << std::endl;
        return 1;
     }
-    std::cout << "TCP/IP magic number OK" << std::endl;
     return 0;
 }
 
@@ -249,9 +248,9 @@ int main(int argc, char **argv) {
 	load_pedestal(receiver_settings.pedestal_file_name);
 
         // Load test data
-        std::ifstream ifile("output_data_bshuf64.dat", std::ios::binary | std::ios::in);
-        ifile.read(ib_buffer, NPIXEL * sizeof(uint16_t) * 4000L);
-        ifile.close();
+        //std::ifstream ifile("output_data.dat", std::ios::binary | std::ios::in);
+        //ifile.read((char *) frame_buffer, NPIXEL * sizeof(uint16_t) * FRAME_BUF_SIZE);
+        //ifile.close();
 
 	// Establish RDMA link
 	if (setup_ibverbs(ib_settings, receiver_settings.ib_dev_name.c_str(), RDMA_SQ_SIZE, 0) == 1) exit(EXIT_FAILURE);
@@ -293,7 +292,8 @@ int main(int argc, char **argv) {
 	   std::cout << "IB Ready to send" << std::endl;
 
            std::cout << "Energy: " << experiment_settings.energy_in_keV << " keV" << std::endl;
-           std::cout << "Frames to write : " << experiment_settings.nframes_to_write << std::endl;
+           std::cout << "Frames to write: " << experiment_settings.nframes_to_write << std::endl;
+           std::cout << "Summation: " << experiment_settings.summation << std::endl;
 
            memset(ib_buffer_occupancy, 0, RDMA_SQ_SIZE * sizeof(uint16_t));
            // TODO: Load gain before, only multiply by energy here
@@ -319,7 +319,8 @@ int main(int argc, char **argv) {
 	   PTHREAD_ERROR(ret, pthread_create);
 
            for (int i = 0; i < NMODULES; i++)
-              online_statistics->head[i] = 5000;
+              online_statistics->head[i] = 500000;
+
 	   // Check for thread completion
 	   ret = pthread_join(poll_cq_thread_1, NULL);
 	   PTHREAD_ERROR(ret, pthread_join);
@@ -337,12 +338,13 @@ int main(int argc, char **argv) {
 		ret = pthread_join(compressionThread[i], NULL);
 		PTHREAD_ERROR(ret,pthread_join);
 	   }
+           std::cout << "Sending via IB done" << std::endl;
 
 	   // Send pedestal, header data and collection statistics
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
 
-           for (int i = 0; i < NPIXEL*6; i++)
-	      send(accepted_socket, gain_pedestal_data + i, sizeof(uint16_t), 0);
+//           for (size_t i = 0; i < NPIXEL*6; i++)
+	   send(accepted_socket, gain_pedestal_data, 6*NPIXEL*sizeof(uint16_t), 0);
 
            // Reset QP
            switch_to_reset(ib_settings);

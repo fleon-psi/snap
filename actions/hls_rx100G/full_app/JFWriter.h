@@ -1,11 +1,27 @@
+/*
+ * Copyright 2020 Paul Scherrer Institute
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef JFWRITER_H_
 #define JFWRITER_H_
 
 #include <hdf5.h>
 #include "JFApp.h"
 
-#define RDMA_RQ_SIZE 8192L // Maximum number of receive elements
-#define NCARDS       1
+#define RDMA_RQ_SIZE 256L // Maximum number of receive elements
+#define NCARDS       2
 
 // HDF5 - data file (should be array for multiple files)
 hid_t data_file;
@@ -13,6 +29,8 @@ hid_t data_group;
 hid_t data_dataspace;
 hid_t data_dataset;
 hid_t data_dcpl;
+
+enum compression_t {COMPRESSION_NONE, COMPRESSION_BSHUF_LZ4, COMPRESSION_BSHUF_ZSTD};
 
 // Settings only necessary for writer
 struct writer_settings_t {
@@ -22,6 +40,7 @@ struct writer_settings_t {
 	int nlocations;
 	std::string data_location[256];
 	std::string main_location;
+        compression_t compression; 
 };
 extern writer_settings_t writer_settings;
 
