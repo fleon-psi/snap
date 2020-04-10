@@ -1,5 +1,6 @@
 #
 # Copyright 2017 International Business Machines
+# Copyright 2020 Paul Scherrer Institute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,17 +15,8 @@
 # limitations under the License.
 #
 
-#
-# Generate HDL version of the HLS sources
-#
-# The generated HDL depends on the chip which is used and
-# therefore must match what is being used to build the
-# toplevel SNAP bitstream.
-#
-# FIXME Pass part_number and other parameters from toplevel
-#      build-system as required.
-#
-
+HOSTNAME := $(shell hostname)
+UNAME_P := $(shell uname -p)
 
 # Finding $SNAP_ROOT
 ifndef SNAP_ROOT
@@ -37,28 +29,44 @@ $(error Please make sure that $$SNAP_ROOT is set up correctly.)
 endif
 endif
 
-SNAP_LIBS=${SNAP_ROOT}/software/lib/libsnap.a -L/home/jungfrau/git/pslse/libcxl -lcxl 
-SNAP_INCLUDE=-I${SNAP_ROOT}/software/include -I/home/jungfrau/git/pslse/libcxl -I/home/jungfrau/git/pslse/common
+SNAP_LIBS=${SNAP_ROOT}/software/lib/libsnap.a -lcxl 
+SNAP_INCLUDE=-I${SNAP_ROOT}/software/include -I/home/jungfrau/git/pslse/common
 
-HDF5_PATH=/opt/hdf5-1.10.5/include/
-CXX=g++
+ifeq ($(UNAME_P), ppc64le)
+    CXX=xlC_r
+    CC=xlc_r
+    CFLAGS= -std=c99 -qipa -O5 -Wall -mcpu=power9 -qarch=pwr9 -DUSE_ZSTD
+    CXXFLAGS= -std=c++11 -qipa -O5 -Wall -mcpu=power9 -qarch=pwr9 -DUSE_ZSTD
+    LDFLAGS= -qipa -O5 -mcpu=power9 -qarch=pwr9 -llz4 -lm -lpthread -lz -libverbs
+    EXECS=JFReceiver
+endif
+
+ifeq ($(UNAME_P), x86_64)
+    CXX=icpc
+    CC=icc
+    CFLAGS=-g -std=c99 -Ofast -ipo -Wall -DUSE_ZSTD
+    CXXFLAGS= -std=c++11 -Ofast -xHost -ipo -Wall -DUSE_ZSTD
+    LDFLAGS= -Ofast -xHost -ipo -llz4 -lm -lpthread -lz -libverbs
+    EXECS=JFWriter
+endif
+
+HDF5_PATH=/opt/hdf5-1.10.5
+HDF5_LIBS=$(HDF5_PATH)/lib/libhdf5.a
+
 CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include ${SNAP_INCLUDE}
-CXXFLAGS= -O3 -g -Wall
-LDFLAGS= -O3 -L${HDF5_PATH}/lib -llz4 -lm -lpthread -lhdf5 -lz -libverbs
 
-SRCS=JFReceiver.o parse_input.o sharedVariables.o CompressionThread.o IB_Transport.cpp TCP_Transport.cpp #SnapThread.o 
+RCV_SRCS=JFReceiver.o sharedVariables.o SendThread.o IB_Transport.o SnapThread.o
+WR_SRCS=JFWriter.o HDF5_plugin.o IB_Transport.o bitshuffle/bitshuffle.o bitshuffle/bitshuffle_core.o bitshuffle/iochain.o
 
-all: JFReceiver JFWriter
+#all: JFReceiver JFWriter
+all: $(EXECS)
 
-JFWriter: JFWriter.o IB_Transport.cpp TCP_Transport.cpp
-	$(CXX) JFWriter.o IB_Transport.cpp TCP_Transport.cpp -o JFWriter $(JF_LDLIBS) ${LDFLAGS}
+JFWriter: $(WR_SRCS)
+	$(CXX) $(WR_SRCS) -o JFWriter $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) -lzstd
 
-JFReceiver: $(SRCS)
-	$(CXX) $(SRCS) -o JFReceiver $(JF_LDLIBS) ${LDFLAGS} #${SNAP_LIBS}
+JFReceiver: $(RCV_SRCS)
+	$(CXX) $(RCV_SRCS) -o JFReceiver $(JF_LDLIBS) $(LDFLAGS) $(SNAP_LIBS)
 
 clean:
-	rm -f *.o JFReceiver HDF5Writer
+	rm -f *.o bitshuffle/*.o JFReceiver JFWriter
  
-# If you have the host code outside of the default snap directory structure, 
-# change to /path/to/snap/actions/software.mk
-# include $(SNAP_ROOT)/actions/software.mk
