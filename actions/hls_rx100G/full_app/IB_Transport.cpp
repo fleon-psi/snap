@@ -31,7 +31,7 @@ int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t se
 	}
 
 	for (int i = 0; i < num_devices; i++) {
-		if (strncmp(ib_device_name.c_str(), ibv_get_device_name(dev_list[i]),6) == 0) selected = i;
+		if (strncmp(ib_device_name.c_str(), ibv_get_device_name(dev_list[i]),8) == 0) selected = i;
 	}
 
 	if (selected == -1) {
