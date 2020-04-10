@@ -450,7 +450,7 @@ int open_connection_card(int card_id) {
 			writer_connection_settings[card_id].ib_settings, &remote);
 
 	// IB buffer
-	writer_connection_settings[card_id].ib_buffer = (char *) calloc(RDMA_RQ_SIZE, RDMA_BUFFER_MAX_ELEM_SIZE);
+	writer_connection_settings[card_id].ib_buffer = (char *) malloc(RDMA_RQ_SIZE * RDMA_BUFFER_MAX_ELEM_SIZE);
 
 	if (writer_connection_settings[card_id].ib_buffer == NULL) {
 		std::cerr << "Memory allocation error" << std::endl;
@@ -495,6 +495,19 @@ int open_connection_card(int card_id) {
 	return 0;
 }
 
+int tcp_receive(int sockfd, char *buffer, size_t size) {
+    size_t remaining_size = size;
+    while (remaining_size > 0) {
+	ssize_t received = read(sockfd, buffer + (size - remaining_size), remaining_size);
+        if (received <= 0) {
+            std::cerr << "Error reading from TCP/IP socket" << std::endl;
+            return 1;
+        }
+        else remaining_size -= received;
+    }
+    return 0;
+}
+
 int close_connection_card(int card_id) {
         if (experiment_settings.conversion_mode == 255) {
                 close(writer_connection_settings[card_id].sockfd);
@@ -505,24 +518,18 @@ int close_connection_card(int card_id) {
 	read(writer_connection_settings[card_id].sockfd,
 			&(online_statistics[card_id]), sizeof(online_statistics_t));
 
-	for (int i = 0; i < NPIXEL; i ++)
-		read(writer_connection_settings[card_id].sockfd,
-				&(gain_pedestal.gainG0[card_id*NPIXEL+i]), sizeof(uint16_t));
-	for (int i = 0; i < NPIXEL; i ++)
-		read(writer_connection_settings[card_id].sockfd,
-				&(gain_pedestal.gainG1[card_id*NPIXEL+i]), sizeof(uint16_t));
-	for (int i = 0; i < NPIXEL; i ++)
-		read(writer_connection_settings[card_id].sockfd,
-				&(gain_pedestal.gainG2[card_id*NPIXEL+i]), sizeof(uint16_t));
-	for (int i = 0; i < NPIXEL; i ++)
-		read(writer_connection_settings[card_id].sockfd,
-				&(gain_pedestal.pedeG1[card_id*NPIXEL+i]), sizeof(uint16_t));
-	for (int i = 0; i < NPIXEL; i ++)
-		read(writer_connection_settings[card_id].sockfd,
-				&(gain_pedestal.pedeG2[card_id*NPIXEL+i]), sizeof(uint16_t));
-	for (int i = 0; i < NPIXEL; i ++)
-		read(writer_connection_settings[card_id].sockfd,
-				&(gain_pedestal.pedeG0[card_id*NPIXEL+i]), sizeof(uint16_t));
+        tcp_receive(writer_connection_settings[card_id].sockfd,
+                    (char *) gain_pedestal.gainG0, NPIXEL * sizeof(uint16_t));
+        tcp_receive(writer_connection_settings[card_id].sockfd,
+                    (char *) gain_pedestal.gainG1, NPIXEL * sizeof(uint16_t));
+        tcp_receive(writer_connection_settings[card_id].sockfd,
+                    (char *) gain_pedestal.gainG2, NPIXEL * sizeof(uint16_t));
+        tcp_receive(writer_connection_settings[card_id].sockfd,
+                    (char *) gain_pedestal.pedeG1, NPIXEL * sizeof(uint16_t));
+        tcp_receive(writer_connection_settings[card_id].sockfd,
+                    (char *) gain_pedestal.pedeG2, NPIXEL * sizeof(uint16_t));
+        tcp_receive(writer_connection_settings[card_id].sockfd,
+                    (char *) gain_pedestal.pedeG0, NPIXEL * sizeof(uint16_t));
 
 	// Check magic number again - but don't quit, as the program is finishing anyway soon
 	exchange_magic_number(writer_connection_settings[card_id].sockfd);
