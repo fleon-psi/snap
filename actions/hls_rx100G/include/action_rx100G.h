@@ -18,7 +18,11 @@
  * limitations under the License.
  */
 
+#ifdef OCACCEL
+#include <osnap_types.h>
+#else
 #include <snap_types.h>
+#endif
 
 #define FRAME_BUF_SIZE        16384L
 #define FRAME_STATUS_BUF_SIZE 16384
@@ -60,7 +64,8 @@ extern "C" {
 #endif
 
 /* This number is unique and is declared in ~snap/ActionTypes.md */
-#define RX100G_ACTION_TYPE 0x52320100
+#define ACTION_TYPE   0x52320100
+#define RELEASE_LEVEL 0x00000006
 
 /* Data structure used to exchange information between action and application */
 /* Size limit is 108 Bytes */

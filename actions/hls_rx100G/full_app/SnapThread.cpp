@@ -17,9 +17,15 @@
 
 #include <iostream>
 
+#ifdef OCACCEL
+#include <osnap_tools.h>
+#include <libosnap.h>
+#include <osnap_hls_if.h>
+#else
 #include <snap_tools.h>
 #include <libsnap.h>
 #include <snap_hls_if.h>
+#endif
 
 #include "JFReceiver.h"
 
@@ -33,7 +39,14 @@ int setup_snap(uint32_t card_number) {
 	snap_action_flag_t action_irq = (snap_action_flag_t) (SNAP_ACTION_DONE_IRQ | SNAP_ATTACH_IRQ);
 
 	// Allocate the card that will be used
+#ifdef OCACCEL
+        if(card_number == 0)
+                snprintf(device, sizeof(device)-1, "IBM,oc-snap");
+        else
+                snprintf(device, sizeof(device)-1, "/dev/ocxl/IBM,oc-snap.000%d:00:00.1.0", card_number);
+#else
 	snprintf(device, sizeof(device)-1, "/dev/cxl/afu%d.0s", card_number);
+#endif
 	card = snap_card_alloc_dev(device, SNAP_VENDOR_ID_IBM,
 			SNAP_DEVICE_ID_SNAP);
 	if (card == NULL) {
@@ -42,7 +55,7 @@ int setup_snap(uint32_t card_number) {
 	}
 
 	// Attach the action that will be used on the allocated card
-	action = snap_attach_action(card, RX100G_ACTION_TYPE, action_irq, 60);
+	action = snap_attach_action(card, ACTION_TYPE, action_irq, 60);
 	if (action == NULL) {
 		std::cerr << "Failed to attach action for card #" << card_number << " " << strerror(errno) << std::endl;
 		snap_card_free(card);
@@ -91,12 +104,13 @@ void *snap_thread(void *in_threadarg) {
 
 	if (rc) std::cerr << "Action failed" << std::endl;
         std::cout << "SNAP action done" << std::endl;
-	// Reset Ethernet CMAC
-	//std::cout << "Resetting 100G CMAC" << std::endl;
-	//mjob.mode = MODE_RESET;
-	//snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
 
-	//rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
+        // Reset Ethernet CMAC
+	std::cout << "Resetting 100G CMAC" << std::endl;
+	mjob.mode = MODE_RESET;
+	snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
+
+	rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
 
 	pthread_exit(0);
 }

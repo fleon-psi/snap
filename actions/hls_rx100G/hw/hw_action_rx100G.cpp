@@ -452,7 +452,7 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 	// Used for the discovery phase of the cards */
 	switch (act_reg->Control.flags) {
 	case 0:
-		Action_Config->action_type = RX100G_ACTION_TYPE; //TO BE ADAPTED
+		Action_Config->action_type = ACTION_TYPE;
 		Action_Config->release_level = RELEASE_LEVEL;
 		act_reg->Control.Retc = 0xe00f;
 		return;

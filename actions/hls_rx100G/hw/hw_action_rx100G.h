@@ -32,10 +32,6 @@
 #define PEDE_G0_PRECISION 24
 #define PEDESTAL_WINDOW_SIZE 128
 
-//--------------------------------------------------------------------
-// 1: simplify the data casting style
-#define RELEASE_LEVEL		0x00000005
-
 typedef char word_t[BPERDW];
 
 typedef ap_ufixed<PEDE_G0_PRECISION,14, SC_RND_CONV> pedeG0_t;
