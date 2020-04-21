@@ -19,13 +19,12 @@
 #define URAM_PARITITION 4
 #define HBM_BURST_G1G2 4
 
-void update_pedestal(ap_uint<512> data_in, ap_uint<18*32> &data_out, packed_pedeG0_t &packed_pede, ap_uint<1> accumulate, ap_uint<8> mode) {
+void update_pedestal(ap_uint<512> data_in, ap_uint<18*32> &data_out, packed_pedeG0_t &packed_pede, ap_uint<1> accumulate, ap_uint<8> mode, ap_uint<32> mask) {
 #pragma HLS PIPELINE II=1
 #pragma HLS INLINE off
 	// Load current pedestal
 	pedeG0_t pedestal[32];
 	unpack_pedeG0(packed_pede, pedestal);
-
 	for (int j = 0; j < 32; j++) {
 		ap_uint<2> gain = data_in(16 * j + 15,16 * j + 14);
 		ap_uint<14> adu = data_in(16 * j + 13,16 * j);
@@ -41,7 +40,11 @@ void update_pedestal(ap_uint<512> data_in, ap_uint<18*32> &data_out, packed_pede
 			else
 				pedestal[j] += val_diff / PEDESTAL_WINDOW_SIZE;
 		}
-
+                if (((gain != 0x0) && (mode == MODE_PEDEG0)) ||
+                    ((gain != 0x1) && (mode == MODE_PEDEG1)) ||
+                    ((gain != 0x3) && (mode == MODE_PEDEG2))) {
+                        mask[j] = 1;       
+                }
 		// Calculate G0 pedestal correction - anyway - it will be overwritten on next steps
 
 		for (int k = 0; k < 18; k++)
@@ -73,7 +76,7 @@ void pedestalG0(DATA_STREAM &in, DATA_STREAM &out, conversion_settings_t convers
 				// Copy old packet
 				packet_out = packet_in;
 
-				update_pedestal(packet_in.data, packet_out.conv_data,packed_pedeG0[offset+i], accumulate_pede, mode);
+				update_pedestal(packet_in.data, packet_out.conv_data,packed_pedeG0[offset+i], accumulate_pede, mode, pixel_mask[offset+i]);
 				// Send packet out
 				out << packet_out;
 				in >> packet_in;
