@@ -297,7 +297,8 @@ static int process_action(snap_membus_t *din_gmem,
 	eth_settings.fpga_mac_addr = act_reg->Data.fpga_mac_addr;
 	eth_settings.fpga_ipv4_addr = act_reg->Data.fpga_ipv4_addr;
 	eth_settings.frame_number_to_stop = act_reg->Data.expected_frames;
-	eth_settings.frame_number_to_quit = act_reg->Data.expected_frames + 5;
+	eth_settings.frame_number_to_quit = act_reg->Data.expected_frames + DELAY_FRAMES_STOP_AND_QUIT;
+        eth_settings.first_frame_number = act_reg->Data.first_frame_number;
 
 	conversion_settings_t conversion_settings;
 	conversion_settings.pedestalG0_frames = act_reg->Data.pedestalG0_frames;
@@ -387,8 +388,12 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 		snap_HBMbus_t *d_hbm_p8, snap_HBMbus_t *d_hbm_p9,
 		snap_HBMbus_t *d_hbm_p10, snap_HBMbus_t *d_hbm_p11,
 		AXI_STREAM &din_eth, AXI_STREAM &dout_eth, volatile ap_uint<1> &eth_reset,
+#ifdef OCACCEL
+		action_reg *act_reg)
+#else
 		action_reg *act_reg,
 		action_RO_config_reg *Action_Config)
+#endif
 {
 	// Host Memory AXI Interface - CANNOT BE REMOVED - NO CHANGE BELOW
 #pragma HLS INTERFACE m_axi port=din_gmem bundle=host_mem offset=slave depth=512 \
@@ -405,8 +410,12 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 	 * #pragma HLS INTERFACE s_axilite port=d_ddrmem bundle=ctrl_reg offset=0x050
 	 */
 	// Host Memory AXI Lite Master Interface - NO CHANGE BELOW
+
+#ifndef OCACCEL
 #pragma HLS DATA_PACK variable=Action_Config
 #pragma HLS INTERFACE s_axilite port=Action_Config bundle=ctrl_reg offset=0x010
+#endif
+
 #pragma HLS DATA_PACK variable=act_reg
 #pragma HLS INTERFACE s_axilite port=act_reg bundle=ctrl_reg offset=0x100
 #pragma HLS INTERFACE s_axilite port=return bundle=ctrl_reg
@@ -450,14 +459,16 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 	//	NOTE: switch generates better vhdl than "if" */
 	// Test used to exit the action if no parameter has been set.
 	// Used for the discovery phase of the cards */
+#ifndef OCACCEL
 	switch (act_reg->Control.flags) {
 	case 0:
-		Action_Config->action_type = ACTION_TYPE;
+		Action_Config->action_type = RX100G_ACTION_TYPE; //TO BE ADAPTED
 		Action_Config->release_level = RELEASE_LEVEL;
 		act_reg->Control.Retc = 0xe00f;
 		return;
 		break;
 	default:
+#endif
 		if (act_reg->Data.mode == MODE_RESET)
                 {
 #pragma HLS PROTOCOL fixed
@@ -470,7 +481,9 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
                 } else {
 			process_action(din_gmem, dout_gmem, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, d_hbm_p8, d_hbm_p9, d_hbm_p10, d_hbm_p11, din_eth, dout_eth, act_reg);
 		} 
+#ifndef OCACCEL
 		break;
 	}
+#endif
 }
 

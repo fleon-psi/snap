@@ -70,10 +70,11 @@ extern "C" {
 /* Data structure used to exchange information between action and application */
 /* Size limit is 108 Bytes */
 typedef struct rx100G_job {
-	uint64_t in_gain_pedestal_data_addr;
-	uint64_t out_frame_buffer_addr;
-	uint64_t out_frame_status_addr;
-	uint64_t out_jf_packet_headers_addr;
+   uint64_t in_gain_pedestal_data_addr;
+    uint64_t out_frame_buffer_addr;
+    uint64_t out_frame_status_addr;
+    uint64_t out_jf_packet_headers_addr;
+    uint64_t first_frame_number;
     uint64_t expected_frames;
     uint64_t pedestalG0_frames;
     uint64_t fpga_mac_addr;
