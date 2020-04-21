@@ -44,7 +44,7 @@ endif
 ifeq ($(UNAME_P), x86_64)
     CXX=icpc
     CC=icc
-    CFLAGS=-g -std=c99 -Ofast -ipo -Wall -DUSE_ZSTD
+    CFLAGS=-g -std=c99 -Ofast -xHost -ipo -Wall -DUSE_ZSTD
     CXXFLAGS= -std=c++11 -Ofast -xHost -ipo -Wall -DUSE_ZSTD
     LDFLAGS= -Ofast -xHost -ipo -llz4 -lm -lpthread -lz -libverbs
     EXECS=JFWriter
@@ -56,7 +56,7 @@ HDF5_LIBS=$(HDF5_PATH)/lib/libhdf5.a
 CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include ${SNAP_INCLUDE}
 
 RCV_SRCS=JFReceiver.o sharedVariables.o SendThread.o IB_Transport.o SnapThread.o
-WR_SRCS=JFWriter.o HDF5_plugin.o IB_Transport.o bitshuffle/bitshuffle.o bitshuffle/bitshuffle_core.o bitshuffle/iochain.o
+WR_SRCS=JFWriter.o JFWriter_HDF5.o IB_Transport.o bitshuffle/bshuf_h5filter.o bitshuffle/bitshuffle.o bitshuffle/bitshuffle_core.o bitshuffle/iochain.o
 
 #all: JFReceiver JFWriter
 all: $(EXECS)

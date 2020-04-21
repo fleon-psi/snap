@@ -44,10 +44,11 @@ int setup_snap(uint32_t card_number) {
 	// Attach the action that will be used on the allocated card
 	action = snap_attach_action(card, RX100G_ACTION_TYPE, action_irq, 60);
 	if (action == NULL) {
-		std::cerr << "Failed to attacj action for card #" << card_number << " " << strerror(errno) << std::endl;
+		std::cerr << "Failed to attach action for card #" << card_number << " " << strerror(errno) << std::endl;
 		snap_card_free(card);
 		return 1;
 	}
+        std::cout << "CAPI FPGA card #" << card_number << " attached" << std::endl;
 	return 0;
 }
 
@@ -58,6 +59,7 @@ void close_snap() {
 }
 
 void *snap_thread(void *in_threadarg) {
+        std::cout << "SNAP Thread: Started" << std::endl;
 	int rc = 0;
 
 	// Control register
@@ -88,13 +90,13 @@ void *snap_thread(void *in_threadarg) {
 	rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
 
 	if (rc) std::cerr << "Action failed" << std::endl;
-
+        std::cout << "SNAP action done" << std::endl;
 	// Reset Ethernet CMAC
-	std::cout << "Resetting 100G CMAC" << std::endl;
-	mjob.mode = MODE_RESET;
-	snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
+	//std::cout << "Resetting 100G CMAC" << std::endl;
+	//mjob.mode = MODE_RESET;
+	//snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
 
-	rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
+	//rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
 
 	pthread_exit(0);
 }

@@ -21,7 +21,6 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <algorithm>
-#include <hdf5.h>
 #include <chrono>
 
 #include <endian.h>
@@ -33,13 +32,7 @@
 
 #include "JFWriter.h"
 #include "bitshuffle/bitshuffle.h"
-
-#define LZ4_BLOCK_SIZE  0
-#define ZSTD_BLOCK_SIZE (8*514*1030)
-
-extern "C" {
-extern H5Z_class_t H5Z_JF[1];
-}
+#include "bitshuffle/bshuf_h5filter.h"
 
 writer_settings_t writer_settings;
 gain_pedestal_t gain_pedestal;
@@ -51,7 +44,6 @@ writer_connection_settings_t writer_connection_settings[NCARDS];
 uint8_t writers_done_per_file;
 pthread_mutex_t writers_done_per_file_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t writers_done_per_file_cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 size_t total_compressed_size = 0;
 pthread_mutex_t total_compressed_size_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -59,207 +51,12 @@ pthread_mutex_t total_compressed_size_mutex = PTHREAD_MUTEX_INITIALIZER;
 uint64_t remaining_frames[NCARDS];
 pthread_mutex_t remaining_frames_mutex[NCARDS];
 
+int exchange_magic_number(int sockfd);
 
 // Taken from bshuf
 extern "C" {
     void bshuf_write_uint64_BE(void* buf, uint64_t num); 
     void bshuf_write_uint32_BE(void* buf, uint32_t num);
-}
-
-int addStringAttribute(hid_t location, std::string name, std::string val) {
-	/* https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_attribute.c */
-	hid_t aid = H5Screate(H5S_SCALAR);
-	hid_t atype = H5Tcopy(H5T_C_S1);
-	H5Tset_size(atype, val.length());
-	H5Tset_strpad(atype,H5T_STR_NULLTERM);
-	hid_t attr = H5Acreate2(location, name.c_str(), atype, aid, H5P_DEFAULT, H5P_DEFAULT);
-	herr_t ret = H5Awrite(attr, atype, val.c_str());
-	ret = H5Sclose(aid);
-	ret = H5Tclose(atype);
-	ret = H5Aclose(attr);
-
-	return 0;
-}
-
-int addDoubleAttribute(hid_t location, std::string name, const double *val, int dim) {
-    // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
-    hsize_t dims[1];
-    dims[0] = dim;
-
-    /* Create the data space for the dataset. */
-    hid_t dataspace_id = H5Screate_simple(1, dims, NULL);
-
-    hid_t attr = H5Acreate2(location, name.c_str(), H5T_IEEE_F64LE, dataspace_id, H5P_DEFAULT, H5P_DEFAULT);
-
-    herr_t ret = H5Awrite(attr, H5T_NATIVE_DOUBLE, val);
-
-    ret = H5Sclose(dataspace_id);
-    ret = H5Aclose(attr);
-
-    return 0;
-}
-
-hid_t createGroup(hid_t master_file_id, std::string group, std::string nxattr) {
-	hid_t group_id = H5Gcreate(master_file_id, group.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-	if (nxattr != "") addStringAttribute(group_id, "NX_class", nxattr);
-	return group_id;
-}
-
-int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim1, int dim2, int dim3, double multiplier) {
-    herr_t status;
-
-    // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
-    hsize_t dims[3];
-    dims[0] = dim1;
-    dims[1] = dim2;
-    dims[2] = dim3;
-
-    // Create the data space for the dataset.
-    hid_t dataspace_id = H5Screate_simple(3, dims, NULL);
-
-    // Create the dataset.
-    hid_t dataset_id = H5Dcreate2(location, name.c_str(), H5T_STD_U16LE, dataspace_id,
-                                  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-
-    // Write the dataset.
-    status = H5Dwrite(dataset_id, H5T_NATIVE_USHORT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                      val);
-
-    addDoubleAttribute(dataset_id, "multiplier", &multiplier, 1);
-
-    // End access to the dataset and release resources used by it.
-    status = H5Dclose(dataset_id);
-
-    // Terminate access to the data space.
-    status = H5Sclose(dataspace_id);
-
-    return 0;
-}
-
-int open_HDF5_file(uint32_t file_id) {
-	int32_t frames = experiment_settings.nframes_to_write - writer_settings.images_per_file * file_id;
-	if (frames >  writer_settings.images_per_file) frames =  writer_settings.images_per_file;
-	if (frames <= 0) return 1;
-
-	// generate filename for data file
-	char buff[12];
-	snprintf(buff,12,"data_%06d", file_id+1);
-	std::string filename = writer_settings.HDF5_prefix+"_"+std::string(buff)+".h5";
-
-	// Create data file
-	data_file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	if (data_file < 0) {
-		std::cerr << "HDF5 data file error" << std::endl;
-		return 1;
-	}
-
-	hid_t grp = createGroup(data_file, "/entry", "NXentry");
-	H5Gclose(grp);
-
-	data_group = createGroup(data_file, "/entry/data","NXdata");
-
-	herr_t h5ret;
-
-	// https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
-	hsize_t dims[3], chunk[3];
-
-	dims[0] = frames;
-	dims[1] = 514 * NMODULES * NCARDS;
-	dims[2] = 1030;
-
-	chunk[0] = 1;
-	chunk[1] = 514 * NMODULES;
-	chunk[2] = 1030;
-
-	// Create the data space for the dataset.
-	data_dataspace = H5Screate_simple(3, dims, NULL);
-
-	data_dcpl = H5Pcreate (H5P_DATASET_CREATE);
-	h5ret = H5Pset_chunk (data_dcpl, 3, chunk);
-
-	// Set appropriate compression filter
-	// SetCompressionFilter(data_dcpl_id);
-
-	// Create the dataset.
-	data_dataset = H5Dcreate2(data_group, "data", H5T_STD_I16LE, data_dataspace,
-			H5P_DEFAULT, data_dcpl, H5P_DEFAULT);
-
-	// Add attributes
-	int tmp = file_id *  writer_settings.images_per_file + 1;
-	hid_t aid = H5Screate(H5S_SCALAR);
-	hid_t attr = H5Acreate2(data_dataset, "image_nr_low", H5T_STD_I32LE, aid, H5P_DEFAULT, H5P_DEFAULT);
-	h5ret = H5Awrite(attr, H5T_NATIVE_INT, &tmp);
-	h5ret = H5Sclose(aid);
-	h5ret = H5Aclose(attr);
-
-	tmp = tmp+frames-1;
-	aid = H5Screate(H5S_SCALAR);
-	attr = H5Acreate2(data_dataset, "image_nr_high", H5T_STD_I32LE, aid, H5P_DEFAULT, H5P_DEFAULT);
-	h5ret = H5Awrite(attr, H5T_NATIVE_INT, &tmp);
-	h5ret = H5Sclose(aid);
-	h5ret = H5Aclose(attr);
-	return 0;
-}
-
-int save_gain_pedestal_hdf5() {
-	// Define filename
-	std::string filename = "";
-	if (writer_settings.main_location != "") filename =
-			writer_settings.main_location + "/" +
-			writer_settings.HDF5_prefix + "_calibration.h5";
-	else filename = writer_settings.HDF5_prefix + "_calibration.h5";
-
-	// Create data file
-	hid_t hdf5_file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	if (hdf5_file < 0) {
-		std::cerr << "Cannot create file: " << filename << std::endl;
-		return 1;
-	}
-	hid_t grp = createGroup(hdf5_file, "/entry", "NXentry");
-	H5Gclose(grp);
-
-	grp = createGroup(hdf5_file, "/entry/adu_to_photon","");
-	saveUInt16_3D(grp, "G0", gain_pedestal.gainG0, 1024, 512, NMODULES * NCARDS, 1.0/(16384.0*512.0));
-	saveUInt16_3D(grp, "G1", gain_pedestal.gainG1, 1024, 512, NMODULES * NCARDS, -1.0/8192);
-	saveUInt16_3D(grp, "G2", gain_pedestal.gainG2, 1024, 512, NMODULES * NCARDS, -1.0/8192);
-	H5Gclose(grp);
-
-	grp = createGroup(hdf5_file, "/entry/pedestal_in_adu","");
-	saveUInt16_3D(grp, "G0", gain_pedestal.pedeG0, 1024, 512, NMODULES * NCARDS, 0.25);
-	saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, 1024, 512, NMODULES * NCARDS, 0.25);
-	saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, 1024, 512, NMODULES * NCARDS, 0.25);
-	H5Gclose(grp);
-
-        H5Fclose(hdf5_file);
-	return 0;
-}
-
-void close_HDF5_file() {
-	H5Pclose (data_dcpl);
-
-	/* End access to the dataset and release resources used by it. */
-	H5Dclose(data_dataset);
-
-	/* Terminate access to the data space. */
-	H5Sclose(data_dataspace);
-
-	H5Gclose(data_group);
-	H5Fclose(data_file);
-}
-
-int exchange_magic_number(int sockfd) {
-	uint64_t magic_number;
-
-	// Receive magic number
-	read(sockfd, &magic_number, sizeof(uint64_t));
-	// Reply with whatever was received
-	send(sockfd, &magic_number, sizeof(uint64_t), 0);
-	if (magic_number != TCPIP_CONN_MAGIC_NUMBER) {
-		std::cerr << "Mismatch in TCP/IP communication" << std::endl;                
-		return 1;
-	}
-	std::cout << "Magic number OK" << std::endl;
-	return 0;
 }
 
 int TCP_connect(int &sockfd, std::string hostname, uint16_t port) {
@@ -311,12 +108,18 @@ int parse_input(int argc, char **argv) {
 	experiment_settings.nframes_to_collect = 16384;
 	experiment_settings.nframes_to_write   = 0;
         experiment_settings.summation          = 1;
+        experiment_settings.detector_distance  = 80.0;
+        experiment_settings.beam_x             = 514.0+18.0;
+        experiment_settings.beam_y             = (1030.0+36.0)*(NMODULES*NCARDS/4.0);
+        experiment_settings.frame_time         = 0.000500;
+        experiment_settings.count_time         = 0.000470;
 
-        writer_settings.main_location = "/mnt/zfs";
+        writer_settings.main_location = "/mnt/n0ssd";
 	writer_settings.HDF5_prefix = "";
 	writer_settings.images_per_file = 1000;
-        writer_settings.compression        = COMPRESSION_NONE;
-        
+        writer_settings.compression     = COMPRESSION_NONE;
+        writer_settings.write_hdf5      = false;
+
         writer_settings.nthreads = NCARDS;
         writer_settings.nlocations = 0;
 
@@ -331,9 +134,27 @@ int parse_input(int argc, char **argv) {
 		writer_connection_settings[1].receiver_tcp_port = 52321;
 	}
 
-	while ((opt = getopt(argc,argv,":E:P:012LZRc:w:f:i:hxT:rsS:R")) != EOF)
+	while ((opt = getopt(argc,argv,":E:P:012LZRc:w:f:i:hqt:rsS:RX:Y:D:F:C:T:")) != EOF)
 		switch(opt)
 		{
+                case 'T':
+                        experiment_settings.transmission = atof(optarg);
+                        break;
+                case 'X':
+                        experiment_settings.beam_x = atof(optarg);
+                        break;
+                case 'Y':
+                        experiment_settings.beam_y = atof(optarg);
+                        break;
+                case 'D':
+                        experiment_settings.detector_distance = atof(optarg);
+                        break;
+                case 'F':
+                        experiment_settings.frame_time = atof(optarg);
+                        break;
+                case 'C':
+                        experiment_settings.count_time = atof(optarg);
+                        break;
 		case 'E':
 			experiment_settings.energy_in_keV = atof(optarg);
 			break;
@@ -358,7 +179,10 @@ int parse_input(int argc, char **argv) {
 		case 'Z':
 			writer_settings.compression = COMPRESSION_BSHUF_ZSTD;
 			break;
-		case 'x':
+                case 'h':
+                        writer_settings.write_hdf5 = true;
+                        break;
+		case 'q':
 			experiment_settings.conversion_mode = 255;
 			break;
 		case 'c':
@@ -376,7 +200,7 @@ int parse_input(int argc, char **argv) {
 		case 'S':
 			experiment_settings.summation = atoi(optarg);
 			break;
-		case 'T':
+		case 't':
 			writer_settings.nthreads = atoi(optarg) * NCARDS;
 			break;
 		case 'r':
@@ -508,12 +332,28 @@ int tcp_receive(int sockfd, char *buffer, size_t size) {
     return 0;
 }
 
+int exchange_magic_number(int sockfd) {
+	uint64_t magic_number;
+
+	// Receive magic number
+	read(sockfd, &magic_number, sizeof(uint64_t));
+	// Reply with whatever was received
+	send(sockfd, &magic_number, sizeof(uint64_t), 0);
+	if (magic_number != TCPIP_CONN_MAGIC_NUMBER) {
+		std::cerr << "Mismatch in TCP/IP communication" << std::endl;                
+		return 1;
+	}
+	std::cout << "Magic number OK" << std::endl;
+	return 0;
+}
+
+
 int close_connection_card(int card_id) {
         if (experiment_settings.conversion_mode == 255) {
                 close(writer_connection_settings[card_id].sockfd);
                 return 0;
         }
-
+        
 	// Send pedestal, header data and collection statistics
 	read(writer_connection_settings[card_id].sockfd,
 			&(online_statistics[card_id]), sizeof(online_statistics_t));
@@ -530,6 +370,8 @@ int close_connection_card(int card_id) {
                     (char *) gain_pedestal.pedeG2, NPIXEL * sizeof(uint16_t));
         tcp_receive(writer_connection_settings[card_id].sockfd,
                     (char *) gain_pedestal.pedeG0, NPIXEL * sizeof(uint16_t));
+        tcp_receive(writer_connection_settings[card_id].sockfd,
+                    (char *) gain_pedestal.pixel_mask, NPIXEL * sizeof(uint16_t));
 
 	// Check magic number again - but don't quit, as the program is finishing anyway soon
 	exchange_magic_number(writer_connection_settings[card_id].sockfd);
@@ -619,21 +461,30 @@ void *writer_thread(void* thread_arg) {
 
                 switch(writer_settings.compression) {
                     case COMPRESSION_NONE:
-		        write_frame(ib_buffer_location, frame_size, frame_id, card_id);
+                        if (writer_settings.write_hdf5 == true)
+                            save_data_hdf(ib_buffer_location, frame_size, frame_id, card_id);
+                        else 
+		            write_frame(ib_buffer_location, frame_size, frame_id, card_id);
                         break;
 
                     case COMPRESSION_BSHUF_LZ4:
 		        bshuf_write_uint64_BE(compression_buffer, 514*1030*NMODULES * elem_size);
 		        bshuf_write_uint32_BE(compression_buffer + 8, LZ4_BLOCK_SIZE);
                         frame_size = bshuf_compress_lz4(ib_buffer_location, compression_buffer + 12, 514*1030*NMODULES, elem_size, LZ4_BLOCK_SIZE) + 12;
-		        write_frame(compression_buffer, frame_size, frame_id, card_id);
+                        if (writer_settings.write_hdf5 == true)
+       	       	       	    save_data_hdf(compression_buffer, frame_size, frame_id, card_id);
+       	       	       	else 
+		            write_frame(compression_buffer, frame_size, frame_id, card_id);
                         break;
 
                     case COMPRESSION_BSHUF_ZSTD:
 		        bshuf_write_uint64_BE(compression_buffer, 514*1030*NMODULES * elem_size);
 		        bshuf_write_uint32_BE(compression_buffer + 8, ZSTD_BLOCK_SIZE);
                         frame_size = bshuf_compress_zstd(ib_buffer_location, compression_buffer + 12, 514*1030*NMODULES, elem_size, ZSTD_BLOCK_SIZE) + 12;
-		        write_frame(compression_buffer, frame_size, frame_id, card_id);
+                        if (writer_settings.write_hdf5 == true)
+       	       	       	    save_data_hdf(compression_buffer, frame_size, frame_id, card_id);
+       	       	       	else 
+		            write_frame(compression_buffer, frame_size, frame_id, card_id);
                         break;       
                 }
 
@@ -658,15 +509,15 @@ void *writer_thread(void* thread_arg) {
 
 int main(int argc, char **argv) {
 	int ret;
-
-	// Register JF specific filter
-	H5Zregister(&H5Z_JF);
+        
+        // Register HDF5 bitshuffle filter
+        H5Zregister(bshuf_H5Filter);
 
 	// Parse input
 	if (parse_input(argc, argv) == 1) exit(EXIT_FAILURE);
 
         // Setup connections with two receivers in parallel doesn't work
-        // IB Verbs is theoretically thread-safe, but...
+        // IB Verbs is theoretically thread-safe, but there is something very wrong happening
 //        pthread_t setup[NCARDS];
 //        writer_thread_arg_t setup_thread_arg[NCARDS]; 
 	for (int i = 0; i < NCARDS; i++) {
@@ -684,13 +535,15 @@ int main(int argc, char **argv) {
 	pthread_t writer[writer_settings.nthreads];
 	writer_thread_arg_t writer_thread_arg[writer_settings.nthreads];
 
+        if (writer_settings.write_hdf5) open_data_hdf5();
+
 	if (experiment_settings.nframes_to_write > 0) {
 		auto start = std::chrono::system_clock::now();
 
 		for (int i = 0; i < writer_settings.nthreads; i++) {
 			writer_thread_arg[i].thread_id = i / NCARDS;
                         if (NCARDS > 1) 
-			    writer_thread_arg[i].card_id   = i % NCARDS;
+			    writer_thread_arg[i].card_id = i % NCARDS;
                         else
                             writer_thread_arg[i].card_id = 0;
 			ret = pthread_create(&(writer[i]), NULL, writer_thread, &(writer_thread_arg[i]));
@@ -710,8 +563,11 @@ int main(int argc, char **argv) {
 
 	for (int i = 0; i < NCARDS; i++)
 			close_connection_card(i);
-
 	// Only save pedestal and gain, if filename provided
-	if (writer_settings.HDF5_prefix != "")
+        if (writer_settings.write_hdf5) close_data_hdf5();
+	if (writer_settings.HDF5_prefix != "") {
 		save_gain_pedestal_hdf5();
+                save_master_hdf5();
+        }
+
 }

@@ -34,13 +34,13 @@ int parse_input(int argc, char **argv) {
 	receiver_settings.gain_file_name[3] =
 			"/home/jungfrau/JF2M_X06SA_200310/gainMaps_M373_2020-01-31.bin";
 
-	while ((opt = getopt(argc,argv,":C:T:I:P:p:0:1:2:3:")) != EOF)
+	while ((opt = getopt(argc,argv,":C:t:I:P:p:0:1:2:3:")) != EOF)
 		switch(opt)
 		{
 		case 'C':
 			receiver_settings.card_number = atoi(optarg);
                         //TODO: Only update if no values provided
-                        if  (receiver_settings.card_number == 1) {
+                        if  (receiver_settings.card_number == 0) {
                            receiver_settings.ib_dev_name = "mlx5_2";
                            receiver_settings.fpga_mac_addr = 0xAABBCCDDEEF2;
                            receiver_settings.fpga_ip_addr = 0x0A013206;
@@ -48,7 +48,7 @@ int parse_input(int argc, char **argv) {
 			   receiver_settings.pedestal_file_name = "pedestal_card1.dat";
                         }
 			break;
-		case 'T':
+		case 't':
 			receiver_settings.compression_threads = atoi(optarg);
 			break;
 		case 'I':
@@ -79,7 +79,7 @@ int parse_input(int argc, char **argv) {
 int allocate_memory() {
 	frame_buffer_size       = FRAME_BUF_SIZE * NPIXEL * sizeof(int16_t); // can store FRAME_BUF_SIZE frames
 	status_buffer_size      = FRAME_LIMIT*NMODULES*128/8+64;   // can store 1 bit per each ETH packet expected
-	gain_pedestal_data_size = 6 * 2 * NPIXEL;  // each entry to in_parameters_array is 2 bytes and there are 6 constants per pixel
+	gain_pedestal_data_size = 7 * 2 * NPIXEL;  // each entry to in_parameters_array is 2 bytes and there are 6 constants per pixel + mask
 	jf_packet_headers_size  = FRAME_LIMIT * NMODULES * sizeof(header_info_t);
 	ib_buffer_size          = ((size_t) RDMA_BUFFER_MAX_ELEM_SIZE) * RDMA_SQ_SIZE;
 
@@ -154,21 +154,24 @@ void load_gain(std::string fname, int module, double energy_in_keV) {
 	free(tmp_gain);
 }
 
+// Loads pedestal and pixel mask
 void load_pedestal(std::string fname) {
-	load_bin_file(fname, (char *)(gain_pedestal_data + 3 * NPIXEL), 3 * NPIXEL * sizeof(uint16_t));
+	load_bin_file(fname, (char *)(gain_pedestal_data + 3 * NPIXEL), 4 * NPIXEL * sizeof(uint16_t));
 }
 
+// Saves pedestal and pixel mask
 void save_pedestal(std::string fname) {
 	std::cout << "Saving " << fname.c_str() << std::endl;
 	std::fstream file10(fname.c_str(), std::ios::out | std::ios::binary);
 	if (!file10.is_open()) {
 		std::cerr << "Error opening file " << fname.c_str() << std::endl;
 	} else {
-		file10.write((char *) (gain_pedestal_data + 3 * NPIXEL), 3 * NPIXEL * sizeof(uint16_t));
+		file10.write((char *) (gain_pedestal_data + 3 * NPIXEL), 4 * NPIXEL * sizeof(uint16_t));
 		file10.close();
 	}
 }
 
+// Establish TCP/IP server to communicate with writer
 int TCP_server(uint16_t port) {
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd == 0) {
@@ -263,11 +266,11 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	// Connect to FPGA board
-	// setup_snap(receiver_settings.card_number);
-
 	// Establish TCP/IP server
 	if (TCP_server(receiver_settings.tcp_port) == 1) exit(EXIT_FAILURE);
+
+	// Connect to FPGA board
+	if (setup_snap(receiver_settings.card_number) == 1) exit(EXIT_FAILURE);
 
         while (1) {
 	   // Accept TCP/IP communication
@@ -297,6 +300,7 @@ int main(int argc, char **argv) {
 
            memset(ib_buffer_occupancy, 0, RDMA_SQ_SIZE * sizeof(uint16_t));
            // TODO: Load gain before, only multiply by energy here
+           // TODO: Multi-pixels divided by two/four in gain calculation
 	   // Load gain files (double, per module)
 	   for (int i = 0; i < NMODULES; i++)
 		load_gain(receiver_settings.gain_file_name[i], i, experiment_settings.energy_in_keV);
@@ -318,33 +322,39 @@ int main(int argc, char **argv) {
 	   ret = pthread_create(&poll_cq_thread_1, NULL, poll_cq_thread, NULL);
 	   PTHREAD_ERROR(ret, pthread_create);
 
-           for (int i = 0; i < NMODULES; i++)
-              online_statistics->head[i] = 500000;
+           // Just for test - set collected frames to expected
+           //for (int i = 0; i < NMODULES; i++)
+           //   online_statistics->head[i] = experiment_settings.nframes_to_collect - 1;
+           //online_statistics->good_packets = NMODULES * 128 * experiment_settings.nframes_to_collect;
+
+	   // Start SNAP thread
+	   pthread_t snapThread1;
+	   ret = pthread_create(&snapThread1, NULL, snap_thread, NULL);
+	   PTHREAD_ERROR(ret,pthread_create);
 
 	   // Check for thread completion
 	   ret = pthread_join(poll_cq_thread_1, NULL);
 	   PTHREAD_ERROR(ret, pthread_join);
 
-	   // Start SNAP thread
-	   //pthread_t snapThread1;
-	   //ret = pthread_create(&snapThread1, NULL, snap_thread, NULL);
-	   //PTHREAD_ERROR(ret,pthread_create);
 
-	   // Check for threads completion
-	   //ret = pthread_join(snapThread1, NULL);
-	   //PTHREAD_ERROR(ret,pthread_join);
-
+           // Check for sending threads completion
 	   for	(int i = 0; i <	receiver_settings.compression_threads ; i++) {
 		ret = pthread_join(compressionThread[i], NULL);
 		PTHREAD_ERROR(ret,pthread_join);
 	   }
            std::cout << "Sending via IB done" << std::endl;
+           std::cout << "Good packets " << online_statistics->good_packets << " Frames to collect: " << experiment_settings.nframes_to_collect << std::endl;
+           std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
 
-	   // Send pedestal, header data and collection statistics
+	   // Check for SNAP thread completion
+	   ret = pthread_join(snapThread1, NULL);
+	   PTHREAD_ERROR(ret,pthread_join);
+
+
+	   // Send header data and collection statistics
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
-
-//           for (size_t i = 0; i < NPIXEL*6; i++)
-	   send(accepted_socket, gain_pedestal_data, 6*NPIXEL*sizeof(uint16_t), 0);
+           // Send gain, pedestal and pixel mask
+	   send(accepted_socket, gain_pedestal_data, 7*NPIXEL*sizeof(uint16_t), 0);
 
            // Reset QP
            switch_to_reset(ib_settings);
@@ -355,6 +365,9 @@ int main(int argc, char **argv) {
            TCP_exchange_magic_number();
            close(accepted_socket);
         }
+
+	// Close SNAP
+	close_snap();
 
 	// Save pedestal
 	save_pedestal(receiver_settings.pedestal_file_name);
@@ -367,9 +380,6 @@ int main(int argc, char **argv) {
 
 	// Close RDMA
 	close_ibverbs(ib_settings);
-
-	// Close SNAP
-	// close_snap();
 
 	// Close TCP/IP socket
 	TCP_close_connection();
