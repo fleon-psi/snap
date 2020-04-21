@@ -21,7 +21,8 @@
 
 #include "hw_action_rx100G.h"
 
-packed_pedeG0_t packed_pedeG0[NMODULES * 512 * 1024 / 32];
+packed_pedeG0_t packed_pedeG0[NPIXEL / 32];
+ap_uint<32> pixel_mask[NPIXEL / 32];
 
 void copy_data(snap_membus_t *din_gmem, snap_HBMbus_t *d_hbm0, snap_HBMbus_t *d_hbm1, size_t in_addr) {
 	for (size_t i = 0; i < NMODULES * 512 * 1024 / 32; i ++) {
@@ -116,6 +117,27 @@ void load_pedestal(snap_membus_t *din_gmem, size_t offset) {
 	}
 }
 
+void clear_pixel_mask() {
+    for (size_t i = 0; i < NPIXEL / 32; i ++)
+#pragma HLS unroll factor=4
+        pixel_mask[i] = 0;
+
+}
+
+void update_pixel_mask(snap_membus_t *din_gmem, size_t offset, size_t bit) {
+     for (size_t i = 0; i < NPIXEL / 32 / BURST_SIZE; i ++) {
+#pragma HLS pipeline
+         ap_uint<512> tmp[BURST_SIZE];
+         memcpy(tmp, din_gmem+offset+i*BURST_SIZE, 64*BURST_SIZE);
+         for (int k = 0; k < BURST_SIZE; k++) 
+             for (int j = 0; j < 32; j++) {
+                 if (pixel_mask[i*BURST_SIZE+k][j] == 1) tmp[k][j*16+bit] = 1;
+                 else tmp[k][j*16+bit] = 0;
+             }
+         memcpy(din_gmem+offset+i*BURST_SIZE, &tmp, 64*BURST_SIZE);
+     }
+}
+
 // Taken from HBM_memcopy action
 //convert buffer 256b to 512b
 static void HBMbus_to_membus(snap_HBMbus_t *data_in, snap_membus_t *data_out,
@@ -149,7 +171,7 @@ void make_packet(AXI_STREAM &din_eth, uint64_t frame_number, uint32_t eth_packet
 	packet->dest_mac[4] = 0xEE;
 	packet->dest_mac[5] = 0xF1;
 	packet->ipv4_header_h = 0x45; // Big endian in IP header!
-    packet->ipv4_header_total_length = 0x4C20; // Big endian in IP header!
+        packet->ipv4_header_total_length = 0x4C20; // Big endian in IP header!
 	packet->ipv4_header_dest_ip = 0x0532010A; // Big endian in IP header!
 
 	if (eth_packet > 63)
@@ -269,7 +291,7 @@ static int process_action(snap_membus_t *din_gmem,
 	size_t in_gain_pedestal_addr = act_reg->Data.in_gain_pedestal_data_addr >> ADDR_RIGHT_SHIFT;
 	size_t out_frame_buffer_addr = act_reg->Data.out_frame_buffer_addr >> ADDR_RIGHT_SHIFT;
 	size_t out_frame_status_addr = act_reg->Data.out_frame_status_addr >> ADDR_RIGHT_SHIFT;
-    size_t jf_packet_headers_addr = act_reg->Data.out_jf_packet_headers_addr >> ADDR_RIGHT_SHIFT;
+        size_t jf_packet_headers_addr = act_reg->Data.out_jf_packet_headers_addr >> ADDR_RIGHT_SHIFT;
 
 	eth_settings_t eth_settings;
 	eth_settings.fpga_mac_addr = act_reg->Data.fpga_mac_addr;
@@ -299,7 +321,7 @@ static int process_action(snap_membus_t *din_gmem,
 			d_hbm_p8, d_hbm_p9,
 			d_hbm_p10, d_hbm_p11);
 
-	// Load pedestal estimation into main memory
+	// Load pedestal estimation and pixel_mask into main memory
 	switch (conversion_settings.conversion_mode) {
 	case MODE_PEDEG0:
 	case MODE_CONV:
@@ -312,6 +334,9 @@ static int process_action(snap_membus_t *din_gmem,
 		load_pedestal(din_gmem, in_gain_pedestal_addr + 4 * NPIXEL * 2L / 64);
 		break;
 	}
+
+        // Set pixel mask to zero
+        clear_pixel_mask();
 
 	// Run data collection
 	collect_data(din_eth, eth_settings, dout_gmem, out_frame_buffer_addr, out_frame_status_addr,
@@ -328,12 +353,15 @@ static int process_action(snap_membus_t *din_gmem,
 	case MODE_PEDEG0:
 	case MODE_CONV:
 		save_pedestal(dout_gmem, in_gain_pedestal_addr + 5 * NPIXEL * 2L / 64);
+                update_pixel_mask(din_gmem, in_gain_pedestal_addr + 6 * NPIXEL * 2L / 64, 9);
 		break;
 	case MODE_PEDEG1:
 		save_pedestal(dout_gmem, in_gain_pedestal_addr + 3 * NPIXEL * 2L / 64);
+                update_pixel_mask(din_gmem, in_gain_pedestal_addr + 6 * NPIXEL * 2L / 64, 10);
 		break;
 	case MODE_PEDEG2:
 		save_pedestal(dout_gmem, in_gain_pedestal_addr + 4 * NPIXEL * 2L / 64);
+                update_pixel_mask(din_gmem, in_gain_pedestal_addr + 6 * NPIXEL * 2L / 64, 11);
 		break;
 	}
 
@@ -415,6 +443,9 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 #pragma HLS RESOURCE variable=packed_pedeG0 core=RAM_1P_URAM
 #pragma HLS ARRAY_PARTITION variable=packed_pedeG0 cyclic factor=4 dim=1
 
+#pragma HLS RESOURCE variable=pixel_mask core=RAM_1P_URAM
+#pragma HLS ARRAY_PARTITION variable=pixel_mask cyclic factor=4 dim=1
+
 	/* Required Action Type Detection - NO CHANGE BELOW */
 	//	NOTE: switch generates better vhdl than "if" */
 	// Test used to exit the action if no parameter has been set.
@@ -427,6 +458,7 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 		return;
 		break;
 	default:
+		if (act_reg->Data.mode == MODE_RESET)
                 {
 #pragma HLS PROTOCOL fixed
                    int i;
@@ -435,8 +467,7 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
                       i++; ap_wait();
                    }
                    if (i == 32) eth_reset = 0;
-                }
-		if (act_reg->Data.mode != MODE_RESET) {
+                } else {
 			process_action(din_gmem, dout_gmem, d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, d_hbm_p8, d_hbm_p9, d_hbm_p10, d_hbm_p11, din_eth, dout_eth, act_reg);
 		} 
 		break;
