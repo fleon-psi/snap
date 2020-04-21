@@ -336,7 +336,7 @@ void *send_thread(void *in_threadarg) {
     	ib_wr.send_flags = IBV_SEND_SIGNALED;
         ib_wr.imm_data   = htonl(frame); // Network order
         int ret;
-    	while (ret = ibv_post_send(ib_settings.qp, &ib_wr, &ib_bad_wr)) {
+    	while ((ret = ibv_post_send(ib_settings.qp, &ib_wr, &ib_bad_wr))) {
                 if (ret == ENOMEM)
     		std::cerr << "Sending with IB Verbs failed (ret: ENONEM buffer: " << buffer_id << " len: " << ib_sg.length << ")" << std::endl;
                 else
