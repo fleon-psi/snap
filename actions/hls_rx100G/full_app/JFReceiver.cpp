@@ -330,14 +330,14 @@ int main(int argc, char **argv) {
 	   PTHREAD_ERROR(ret, pthread_create);
 
            // Just for test - set collected frames to expected
-           for (int i = 0; i < NMODULES; i++)
-              online_statistics->head[i] = experiment_settings.nframes_to_collect - 1;
-           online_statistics->good_packets = NMODULES * 128 * experiment_settings.nframes_to_collect;
+           //for (int i = 0; i < NMODULES; i++)
+           //   online_statistics->head[i] = experiment_settings.nframes_to_collect - 1;
+           //online_statistics->good_packets = NMODULES * 128 * experiment_settings.nframes_to_collect;
 
 	   // Start SNAP thread
-	   //pthread_t snapThread1;
-	   //ret = pthread_create(&snapThread1, NULL, snap_thread, NULL);
-	   //PTHREAD_ERROR(ret,pthread_create);
+	   pthread_t snapThread1;
+	   ret = pthread_create(&snapThread1, NULL, snap_thread, NULL);
+	   PTHREAD_ERROR(ret,pthread_create);
 
 	   // Check for thread completion
 	   ret = pthread_join(poll_cq_thread_1, NULL);
@@ -354,8 +354,8 @@ int main(int argc, char **argv) {
            std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
 
 	   // Check for SNAP thread completion
-	   //ret = pthread_join(snapThread1, NULL);
-	   //PTHREAD_ERROR(ret,pthread_join);
+	   ret = pthread_join(snapThread1, NULL);
+	   PTHREAD_ERROR(ret,pthread_join);
 
 	   // Send header data and collection statistics
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
