@@ -40,7 +40,7 @@ int parse_input(int argc, char **argv) {
 		case 'C':
 			receiver_settings.card_number = atoi(optarg);
                         //TODO: Only update if no values provided
-                        if  (receiver_settings.card_number == 0) {
+                        if  (receiver_settings.card_number == 1) {
                            receiver_settings.ib_dev_name = "mlx5_2";
                            receiver_settings.fpga_mac_addr = 0xAABBCCDDEEF2;
                            receiver_settings.fpga_ip_addr = 0x0A013206;
@@ -336,12 +336,12 @@ int main(int argc, char **argv) {
 	   ret = pthread_join(poll_cq_thread_1, NULL);
 	   PTHREAD_ERROR(ret, pthread_join);
 
-
            // Check for sending threads completion
 	   for	(int i = 0; i <	receiver_settings.compression_threads ; i++) {
 		ret = pthread_join(compressionThread[i], NULL);
 		PTHREAD_ERROR(ret,pthread_join);
 	   }
+
            std::cout << "Sending via IB done" << std::endl;
            std::cout << "Good packets " << online_statistics->good_packets << " Frames to collect: " << experiment_settings.nframes_to_collect << std::endl;
            std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
@@ -364,6 +364,10 @@ int main(int argc, char **argv) {
            // Check magic number again
            TCP_exchange_magic_number();
            close(accepted_socket);
+
+           // Reset status buffer
+	   memset(status_buffer, 0x0, status_buffer_size);
+
         }
 
 	// Close SNAP
