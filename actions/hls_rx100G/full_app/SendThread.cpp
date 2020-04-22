@@ -184,7 +184,7 @@ void *poll_cq_thread(void *in_threadarg) {
 				std::cerr << "Failed status " << ibv_wc_status_str(ib_wc.status) << " of IB Verbs send request #" << (int)ib_wc.wr_id << std::endl;
 				pthread_exit(0);
 			}
-			usleep(50);
+			usleep(100);
 		}
 
 		pthread_mutex_lock(&ib_buffer_occupancy_mutex);
