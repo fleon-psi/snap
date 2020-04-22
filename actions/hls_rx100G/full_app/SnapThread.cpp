@@ -47,6 +47,7 @@ int setup_snap(uint32_t card_number) {
 #else
 	snprintf(device, sizeof(device)-1, "/dev/cxl/afu%d.0s", card_number);
 #endif
+        std::cout << "Trying " << device << std::endl;
 	card = snap_card_alloc_dev(device, SNAP_VENDOR_ID_IBM,
 			SNAP_DEVICE_ID_SNAP);
 	if (card == NULL) {
@@ -79,17 +80,18 @@ void *snap_thread(void *in_threadarg) {
 	struct snap_job cjob;
 	struct rx100G_job mjob;
 
-	mjob.expected_frames = experiment_settings.nframes_to_collect;
-	mjob.pedestalG0_frames = experiment_settings.pedestalG0_frames;
-	mjob.mode = experiment_settings.conversion_mode;
-	mjob.fpga_mac_addr = receiver_settings.fpga_mac_addr;   // AA:BB:CC:DD:EE:F1
-	mjob.fpga_ipv4_addr = receiver_settings.fpga_ip_addr;      // 10.1.50.5
+        mjob.first_frame_number = experiment_settings.first_frame_number;
+	mjob.expected_frames    = experiment_settings.nframes_to_collect;
+	mjob.pedestalG0_frames  = experiment_settings.pedestalG0_frames;
+	mjob.mode               = experiment_settings.conversion_mode;
+	mjob.fpga_mac_addr      = receiver_settings.fpga_mac_addr;   // AA:BB:CC:DD:EE:F1
+	mjob.fpga_ipv4_addr     = receiver_settings.fpga_ip_addr;      // 10.1.50.5
 
 	mjob.in_gain_pedestal_data_addr = (uint64_t) gain_pedestal_data;
 	mjob.out_frame_buffer_addr      = (uint64_t) frame_buffer;
 	mjob.out_frame_status_addr      = (uint64_t) online_statistics;
 	mjob.out_jf_packet_headers_addr = (uint64_t) jf_packet_headers;
-        mjob.first_frame_number         = 1;
+
 	// Fill the stucture of data exchanged with the action
 	snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
 

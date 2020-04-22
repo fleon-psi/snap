@@ -19,6 +19,7 @@
 struct experiment_settings_t {
 	uint64_t nframes_to_collect;
 	uint64_t nframes_to_write;
+        uint64_t first_frame_number;
 	uint8_t  conversion_mode;
 	uint64_t pedestalG0_frames;
         uint32_t summation;
