@@ -89,12 +89,12 @@ void *snap_thread(void *in_threadarg) {
 	mjob.out_frame_buffer_addr      = (uint64_t) frame_buffer;
 	mjob.out_frame_status_addr      = (uint64_t) online_statistics;
 	mjob.out_jf_packet_headers_addr = (uint64_t) jf_packet_headers;
-
+        mjob.first_frame_number         = 1;
 	// Fill the stucture of data exchanged with the action
 	snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
 
 	std::cout << "SNAP Thread: Receiving can start" << std::endl;
-
+        std::cout << "IP" << receiver_settings.fpga_ip_addr / 256 / 256 / 256 << "." << (receiver_settings.fpga_ip_addr / 256 / 256) % 256 << "." << receiver_settings.fpga_ip_addr / 256 % 256 << "." << receiver_settings.fpga_ip_addr % 256 << std::endl;
 	// Call the action will:
 	//    write all the registers to the action (MMIO) 
 	//  + start the action 
@@ -103,10 +103,10 @@ void *snap_thread(void *in_threadarg) {
 	rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
 
 	if (rc) std::cerr << "Action failed" << std::endl;
-        std::cout << "SNAP action done" << std::endl;
+        std::cout << "SNAP Thread: action done" << std::endl;
 
         // Reset Ethernet CMAC
-	std::cout << "Resetting 100G CMAC" << std::endl;
+	std::cout << "SNAP Thread: Resetting 100G CMAC" << std::endl;
 	mjob.mode = MODE_RESET;
 	snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
 
