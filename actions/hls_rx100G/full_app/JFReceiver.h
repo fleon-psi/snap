@@ -24,7 +24,7 @@
 #define RECEIVING_DELAY 5
 
 #define RDMA_SQ_PSN 532
-#define RDMA_SQ_SIZE 128L // Maximum number of write elements
+#define RDMA_SQ_SIZE 4096L // Maximum number of write elements
 
 #define PTHREAD_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
