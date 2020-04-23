@@ -462,7 +462,7 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 #ifndef OCACCEL
 	switch (act_reg->Control.flags) {
 	case 0:
-		Action_Config->action_type = RX100G_ACTION_TYPE; //TO BE ADAPTED
+		Action_Config->action_type = ACTION_TYPE; //TO BE ADAPTED
 		Action_Config->release_level = RELEASE_LEVEL;
 		act_reg->Control.Retc = 0xe00f;
 		return;
@@ -472,7 +472,7 @@ void hls_action(snap_membus_t *din_gmem, snap_membus_t *dout_gmem,
 		if (act_reg->Data.mode == MODE_RESET)
                 {
 #pragma HLS PROTOCOL fixed
-                   int i;
+                   int i = 0;
 		   eth_reset = 1;
 		   while (i < 32) {
                       i++; ap_wait();
