@@ -238,9 +238,10 @@ void *send_thread(void *in_threadarg) {
         size_t collected_frame = frame*experiment_settings.summation - trigger_frame;
 
         if (current_frame_number < (collected_frame+experiment_settings.summation-1) + 3) {
-    	// Ensure that all frames were already collected, if not wait 1 ms to try again
+    	// Ensure that all frames were already collected, if not wait 0.5 ms to try again
     	    while ((current_frame_number = lastModuleFrameNumber()) < (collected_frame+experiment_settings.summation-1) + 3) {
-                usleep(1000);
+                usleep(500);
+//                if (arg->ThreadID == 0) std::cout << "Frame :" << frame << " Backlog = " << current_frame_number - (collected_frame+experiment_settings.summation-1) << " " << online_statistics->head[0] << " " << online_statistics->head[1] << " " << online_statistics->head[2] << " " << online_statistics->head[3] << " " << online_statistics->good_packets << std::endl;
             }
         }
 
