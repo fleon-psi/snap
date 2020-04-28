@@ -258,10 +258,11 @@ int main(int argc, char **argv) {
 	load_pedestal(receiver_settings.pedestal_file_name);
 
         // Load test data
-        //std::ifstream ifile("output_data.dat", std::ios::binary | std::ios::in);
-        //ifile.read((char *) frame_buffer, NPIXEL * sizeof(uint16_t) * FRAME_BUF_SIZE);
-        //ifile.close();
-
+#ifdef RECEIVE_FROM_FILE
+        std::ifstream ifile("output_data.dat", std::ios::binary | std::ios::in);
+        ifile.read((char *) frame_buffer, NPIXEL * sizeof(uint16_t) * FRAME_BUF_SIZE);
+        ifile.close();
+#endif
 	// Establish RDMA link
 	if (setup_ibverbs(ib_settings, receiver_settings.ib_dev_name.c_str(), RDMA_SQ_SIZE, 0) == 1) exit(EXIT_FAILURE);
 	std::cout << "IB link ready" << std::endl;
@@ -276,9 +277,10 @@ int main(int argc, char **argv) {
 	// Establish TCP/IP server
 	if (TCP_server(receiver_settings.tcp_port) == 1) exit(EXIT_FAILURE);
 
+#ifndef RECEIVE_FROM_FILE
 	// Connect to FPGA board
 	if (setup_snap(receiver_settings.card_number) == 1) exit(EXIT_FAILURE);
-
+#endif
         while (1) {
 	   // Accept TCP/IP communication
 	   while (TCP_accept_connection() != 0)
@@ -330,14 +332,18 @@ int main(int argc, char **argv) {
 	   PTHREAD_ERROR(ret, pthread_create);
 
            // Just for test - set collected frames to expected
-           //for (int i = 0; i < NMODULES; i++)
-           //   online_statistics->head[i] = experiment_settings.nframes_to_collect - 1;
-           //online_statistics->good_packets = NMODULES * 128 * experiment_settings.nframes_to_collect;
+#ifdef RECEIVE_FROM_FILE
+           for (int i = 0; i < NMODULES; i++)
+              online_statistics->head[i] = experiment_settings.nframes_to_collect - 1;
+           online_statistics->good_packets = NMODULES * 128 * experiment_settings.nframes_to_collect;
+#endif
 
+#ifndef RECEIVE_FROM_FILE
 	   // Start SNAP thread
 	   pthread_t snapThread1;
 	   ret = pthread_create(&snapThread1, NULL, snap_thread, NULL);
 	   PTHREAD_ERROR(ret,pthread_create);
+#endif
 
 	   // Check for thread completion
 	   ret = pthread_join(poll_cq_thread_1, NULL);
@@ -354,9 +360,10 @@ int main(int argc, char **argv) {
            std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
 
 	   // Check for SNAP thread completion
+#ifndef RECEIVE_FROM_FILE
 	   ret = pthread_join(snapThread1, NULL);
 	   PTHREAD_ERROR(ret,pthread_join);
-
+#endif
 	   // Send header data and collection statistics
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
            // Send gain, pedestal and pixel mask
@@ -376,9 +383,10 @@ int main(int argc, char **argv) {
 
         }
 
+#ifndef RECEIVE_FROM_FILE
 	// Close SNAP
 	close_snap();
-
+#endif
 	// Save pedestal
 	save_pedestal(receiver_settings.pedestal_file_name);
 
