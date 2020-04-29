@@ -9,8 +9,8 @@
 
 #include "../include/action_rx100G.h"
 
-#define COMPOSED_IMAGE_SIZE (514*1030*NMODULES)
-#define RDMA_BUFFER_MAX_ELEM_SIZE (COMPOSED_IMAGE_SIZE*sizeof(uint32_t))
+#define COMPOSED_IMAGE_SIZE (514L*1030L*NMODULES)
+//#define RDMA_BUFFER_MAX_ELEM_SIZE (COMPOSED_IMAGE_SIZE*si)
 
 #define TCPIP_CONN_MAGIC_NUMBER 123434L
 #define TCPIP_DONE_MAGIC_NUMBER  56789L
@@ -23,6 +23,7 @@ struct experiment_settings_t {
 	uint8_t  conversion_mode;
 	uint64_t pedestalG0_frames;
         uint32_t summation;
+        size_t   pixel_depth;
 	double   energy_in_keV;
         double   beam_x;
         double   beam_y;
