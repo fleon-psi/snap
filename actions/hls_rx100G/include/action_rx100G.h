@@ -50,7 +50,8 @@ struct online_statistics_t {
 };
 
 struct header_info_t {
-	uint64_t jf_frame_number;
+	uint32_t jf_frame_number;
+	uint32_t jf_packet_number;
 	uint16_t udp_src_port;
 	uint16_t udp_dest_port;
 	uint32_t jf_debug;
@@ -80,6 +81,8 @@ typedef struct rx100G_job {
     uint64_t fpga_mac_addr;
     uint32_t fpga_ipv4_addr;
     uint32_t mode;
+    uint32_t expected_triggers; // 0 = don't wait for trigger
+    uint32_t frames_per_trigger;
 } rx100G_job_t;
 
 #ifdef __cplusplus
