@@ -33,6 +33,9 @@
 #define PEDESTAL_WINDOW_SIZE 128
 #define DELAY_FRAMES_STOP_AND_QUIT 5
 
+//--------------------------------------------------------------------
+// 1: simplify the data casting style
+
 typedef char word_t[BPERDW];
 
 typedef ap_ufixed<PEDE_G0_PRECISION,14, SC_RND_CONV> pedeG0_t;
@@ -46,6 +49,10 @@ typedef ap_ufixed<16,3, SC_RND_CONV>  gainG1G2_t;
 
 typedef ap_uint<PEDE_G0_PRECISION*32> packed_pedeG0_t;
 
+//---------------------------------------------------------------------
+// This is generic. Just adapt names for a new action
+// CONTROL is defined and handled by SNAP 
+// helloworld_job_t is user defined in hls_helloworld/include/action_change_case.h
 typedef struct {
 	CONTROL Control;	/*  16 bytes */
 	rx100G_job_t Data;	/* up to 108 bytes */
@@ -64,12 +71,12 @@ typedef hls::stream<ap_axiu_for_eth> AXI_STREAM;
 
 struct data_packet_t {
 	ap_uint<512> data;
-	ap_uint<18*32> conv_data;
-	ap_uint<24> frame_number; // allowing 16 million frames or 2.5h at 2 kHz
+    ap_uint<18*32> conv_data;
+    ap_uint<24> frame_number; // allowing 16 million frames or 2.5h at 2 kHz
 	ap_uint<4> module; // 0..16
 	ap_uint<8> eth_packet; // 0..128
 	ap_uint<8> axis_packet; // 0..128
-	ap_uint<1> axis_user; // TUSER from AXIS
+    ap_uint<1> axis_user; // TUSER from AXIS
 	ap_uint<1> exit; // exit
 	ap_uint<1> trigger; // debug flag on
 };
@@ -167,6 +174,9 @@ void apply_gain_correction(DATA_STREAM &in, DATA_STREAM &out,
 		snap_HBMbus_t *d_hbm_p6, snap_HBMbus_t *d_hbm_p7,
 		snap_HBMbus_t *d_hbm_p8, snap_HBMbus_t *d_hbm_p9,
 	    ap_uint<2> output_mode);
+
+void check_for_trigger(DATA_STREAM &in, DATA_STREAM &out, uint8_t expected_triggers, ap_uint<24> frames_per_trigger);
+
 void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 		size_t out_frame_buffer_addr, size_t out_frame_status_addr, snap_HBMbus_t *d_hbm_stat);
 

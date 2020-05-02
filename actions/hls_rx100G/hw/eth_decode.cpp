@@ -151,7 +151,7 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 		in.read(packet_in);
 		switch (rcv_state) {
 		case RCV_INIT:
-                        rcv_state = RCV_IGNORE;
+			rcv_state = RCV_IGNORE;
 			decode_eth_1(packet_in.data, header);
 			// UDP port is not checked - should it be as well?
 			if ((header.dest_mac == eth_settings.fpga_mac_addr) && // MAC address
@@ -161,19 +161,19 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 					(header.ipv4_protocol == 0x11) && // UDP
 					(header.ipv4_total_len == 8268)) {
 				// Frame number counts from 0 (it is shifted by one vs. JUNGFRAU header info
-                                // If Frame number is lower than first frame number it should be ignored
-                                // As this is leftover from the previous measurement
-                                if (header.jf_frame_number < eth_settings.first_frame_number) rcv_state = RCV_IGNORE;
-                                else {
-                                    header.jf_frame_number -= eth_settings.first_frame_number;
+				// If Frame number is lower than first frame number it should be ignored
+				// As this is leftover from the previous measurement
+				if (header.jf_frame_number < eth_settings.first_frame_number) rcv_state = RCV_IGNORE;
+				else {
+					header.jf_frame_number -= eth_settings.first_frame_number;
 
-				    // Quit if frame number reported is >= frame_number_to_quit                                   
-				    if (header.jf_frame_number >= eth_settings.frame_number_to_quit) packet_out.exit = 1;
-				    else if (header.jf_frame_number < eth_settings.frame_number_to_stop) {
-				       axis_packet = 0;
-				       rcv_state = RCV_JF_HEADER;
-				    } else rcv_state = RCV_IGNORE;
-                                }
+					// Quit if frame number reported is >= frame_number_to_quit
+					if (header.jf_frame_number >= eth_settings.frame_number_to_quit) packet_out.exit = 1;
+					else if (header.jf_frame_number < eth_settings.frame_number_to_stop) {
+						axis_packet = 0;
+						rcv_state = RCV_JF_HEADER;
+					} else rcv_state = RCV_IGNORE;
+				}
 			}
 			else rcv_state = RCV_IGNORE;
 			break;

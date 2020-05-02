@@ -99,9 +99,12 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t out_frame_buff
 			memcpy(dout_gmem + out_frame_addr, buffer, 128*64);
 
 			if ((packet_in.axis_packet == 127) && (packet_in.axis_user == 0)) {
-				(hbm_cache[module0])[hbm_bit_addr] = 1;
+				ap_uint<256> tmp = ap_uint<256>(1) << hbm_bit_addr;
+				hbm_cache[module0] |= tmp;
 				counter_ok++;
-			} else counter_wrong++;
+			} else
+				counter_wrong++;
+
 
 			in.read(packet_in);
 		}
@@ -116,14 +119,14 @@ void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem, size_t out_frame_buff
 	statistics(31,0) = counter_ok;
 	statistics(63,32) = counter_wrong;
 
-              statistics(64 + 32 * NMODULES + 31, 64 + 32 * NMODULES) = packet_in.frame_number;
+	// statistics(64 + 32 * NMODULES + 31, 64 + 32 * NMODULES) = packet_in.frame_number;
 
-        // For all packets, set head as MAX number
-        for (int i = 0; i < NMODULES; i++)
-              statistics(64 + i * 32 + 31, 64 + i * 32) = INT32_MAX;
+	// For all packets, set head as MAX number
+	for (int i = 0; i < NMODULES; i++)
+		statistics(64 + i * 32 + 31, 64 + i * 32) = INT32_MAX;
 
-        // Save last hbm cache
-        statistics(511,256) = hbm_cache[0];
+	// Save last hbm cache
+	// statistics(511,256) = hbm_cache[0];
 
 	memcpy(dout_gmem+out_frame_status_addr, &statistics, BPERDW);
 }
