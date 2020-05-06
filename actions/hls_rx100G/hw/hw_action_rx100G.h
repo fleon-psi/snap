@@ -180,7 +180,7 @@ void check_for_trigger(DATA_STREAM &in, DATA_STREAM &out, uint8_t expected_trigg
 void write_data(DATA_STREAM &in, snap_membus_t *dout_gmem,
 		size_t out_frame_buffer_addr, size_t out_frame_status_addr, snap_HBMbus_t *d_hbm_stat);
 
-extern packed_pedeG0_t packed_pedeG0[NMODULES * 512 * 1024 / 32];
-extern ap_uint<32> pixel_mask[NMODULES * 512 * 1024 / 32];
+extern packed_pedeG0_t packed_pedeG0[NPIXEL / 32];
+extern ap_uint<32> pixel_mask[NPIXEL / 32];
 
 #endif  /* __ACTION_RX100G_H__*/
