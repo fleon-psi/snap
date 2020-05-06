@@ -134,7 +134,7 @@ void update_pixel_mask(snap_membus_t *din_gmem, size_t offset, size_t bit) {
 				if (pixel_mask[i*BURST_SIZE+k][j] == 1) tmp[k][j*16+bit] = 1;
 				else tmp[k][j*16+bit] = 0;
 			}
-		memcpy(din_gmem+offset+i*BURST_SIZE, &tmp, 64*BURST_SIZE);
+		memcpy(din_gmem+offset+i*BURST_SIZE, tmp, 64*BURST_SIZE);
 	}
 }
 
