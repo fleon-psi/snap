@@ -110,9 +110,6 @@ if { $action_clock_freq == "225MHZ" } {
    CONFIG.POLARITY {ACTIVE_HIGH} \
  ] $m_axis_rx_reset
 
-  # Create instance: axis_clock_converter_0, and set properties
-  set axis_clock_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_0 ]
-
   # Create instance: axis_clock_converter_tx_0, and set properties
   set axis_clock_converter_tx_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_tx_0 ]
   set_property -dict [ list \
@@ -125,8 +122,9 @@ if { $action_clock_freq == "225MHZ" } {
   # Create instance: axis_data_fifo_1, and set properties
   set axis_data_fifo_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_data_fifo:2.0 axis_data_fifo_1 ]
   set_property -dict [ list \
-   CONFIG.FIFO_DEPTH {32768} \
-   CONFIG.FIFO_MEMORY_TYPE {ultra} \
+   CONFIG.FIFO_DEPTH {4096} \
+   CONFIG.FIFO_MEMORY_TYPE {distributed} \
+   CONFIG.IS_ACLK_ASYNC {1} \
  ] $axis_data_fifo_1
 
   # Create instance: cmac_usplus_0, and set properties
@@ -166,59 +164,30 @@ if { $action_clock_freq == "225MHZ" } {
    CONFIG.LOGO_FILE {data/sym_notgate.png} \
  ] $util_vector_logic_0
 
-  # Create instance: util_vector_logic_1, and set properties
-  set util_vector_logic_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 util_vector_logic_1 ]
-  set_property -dict [ list \
-   CONFIG.C_OPERATION {not} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_notgate.png} \
- ] $util_vector_logic_1
-
-  # Create instance: util_vector_logic_2, and set properties
-  set util_vector_logic_2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 util_vector_logic_2 ]
-  set_property -dict [ list \
-   CONFIG.C_OPERATION {not} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_notgate.png} \
- ] $util_vector_logic_2
-
-  # Create instance: util_vector_logic_3, and set properties
-  set util_vector_logic_3 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 util_vector_logic_3 ]
-  set_property -dict [ list \
-   CONFIG.C_OPERATION {or} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_orgate.png} \
- ] $util_vector_logic_3
-
   # Create instance: xlconstant_0, and set properties
   set xlconstant_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_0 ]
 
   # Create interface connections
-  connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins axis_data_fifo_1/S_AXIS]
   connect_bd_intf_net -intf_net axis_clock_converter_tx_0_M_AXIS [get_bd_intf_pins axis_clock_converter_tx_0/M_AXIS] [get_bd_intf_pins cmac_usplus_0/axis_tx]
   connect_bd_intf_net -intf_net axis_data_fifo_1_M_AXIS [get_bd_intf_ports m_axis_rx] [get_bd_intf_pins axis_data_fifo_1/M_AXIS]
-  connect_bd_intf_net -intf_net cmac_usplus_0_axis_rx [get_bd_intf_pins axis_clock_converter_0/S_AXIS] [get_bd_intf_pins cmac_usplus_0/axis_rx]
+  connect_bd_intf_net -intf_net cmac_usplus_0_axis_rx [get_bd_intf_pins axis_data_fifo_1/S_AXIS] [get_bd_intf_pins cmac_usplus_0/axis_rx]
   connect_bd_intf_net -intf_net cmac_usplus_0_gt_tx [get_bd_intf_ports o_gt_tx] [get_bd_intf_pins cmac_usplus_0/gt_tx]
   connect_bd_intf_net -intf_net i_gt_ref_1 [get_bd_intf_ports i_gt_ref] [get_bd_intf_pins cmac_usplus_0/gt_ref_clk]
   connect_bd_intf_net -intf_net i_gt_rx_1 [get_bd_intf_ports i_gt_rx] [get_bd_intf_pins cmac_usplus_0/gt_rx]
   connect_bd_intf_net -intf_net s_axis_tx_1 [get_bd_intf_ports s_axis_tx] [get_bd_intf_pins axis_clock_converter_tx_0/S_AXIS]
 
   # Create port connections
-  connect_bd_net -net cmac_usplus_0_gt_txusrclk2 [get_bd_pins axis_clock_converter_0/s_axis_aclk] [get_bd_pins axis_clock_converter_tx_0/m_axis_aclk] [get_bd_pins cmac_usplus_0/gt_txusrclk2] [get_bd_pins cmac_usplus_0/rx_clk]
-  connect_bd_net -net cmac_usplus_0_usr_rx_reset [get_bd_pins cmac_usplus_0/usr_rx_reset] [get_bd_pins util_vector_logic_0/Op1] [get_bd_pins util_vector_logic_2/Op1]
+  connect_bd_net -net cmac_usplus_0_gt_txusrclk2 [get_bd_pins axis_clock_converter_tx_0/m_axis_aclk] [get_bd_pins axis_data_fifo_1/s_axis_aclk] [get_bd_pins cmac_usplus_0/gt_txusrclk2] [get_bd_pins cmac_usplus_0/rx_clk]
+  connect_bd_net -net cmac_usplus_0_usr_rx_reset [get_bd_pins cmac_usplus_0/usr_rx_reset] [get_bd_pins util_vector_logic_0/Op1]
   connect_bd_net -net ctl_tx_enable_1 [get_bd_ports i_ctl_tx_enable] [get_bd_pins cmac_usplus_0/ctl_tx_enable]
-  connect_bd_net -net i_capi_clk_1 [get_bd_ports i_capi_clk] [get_bd_pins axis_clock_converter_0/m_axis_aclk] [get_bd_pins axis_clock_converter_tx_0/s_axis_aclk] [get_bd_pins axis_data_fifo_1/s_axis_aclk] [get_bd_pins cmac_usplus_0/drp_clk] [get_bd_pins cmac_usplus_0/init_clk]
+  connect_bd_net -net i_capi_clk_1 [get_bd_ports i_capi_clk] [get_bd_pins axis_clock_converter_tx_0/s_axis_aclk] [get_bd_pins axis_data_fifo_1/m_axis_aclk] [get_bd_pins cmac_usplus_0/drp_clk] [get_bd_pins cmac_usplus_0/init_clk]
   connect_bd_net -net i_core_rx_reset_1 [get_bd_ports i_core_rx_reset] [get_bd_pins cmac_usplus_0/core_rx_reset]
   connect_bd_net -net i_core_tx_reset_1 [get_bd_ports i_core_tx_reset] [get_bd_pins cmac_usplus_0/core_tx_reset]
   connect_bd_net -net i_ctl_rx_enable_1 [get_bd_ports i_ctl_rx_enable] [get_bd_pins cmac_usplus_0/ctl_rx_enable]
   connect_bd_net -net i_ctl_rx_rsfec_enable_1 [get_bd_ports i_ctl_rx_rsfec_enable] [get_bd_pins cmac_usplus_0/ctl_rx_rsfec_enable]
   connect_bd_net -net i_ctl_tx_rsfec_enable_1 [get_bd_ports i_ctl_tx_rsfec_enable] [get_bd_pins cmac_usplus_0/ctl_tx_rsfec_enable]
-  connect_bd_net -net i_sys_reset_1 [get_bd_ports i_sys_reset] [get_bd_pins util_vector_logic_3/Op1]
-  connect_bd_net -net m_axis_rx_reset_1 [get_bd_ports m_axis_rx_reset] [get_bd_pins util_vector_logic_3/Op2]
-  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins axis_clock_converter_tx_0/m_axis_aresetn] [get_bd_pins util_vector_logic_0/Res]
-  connect_bd_net -net util_vector_logic_1_Res [get_bd_pins axis_clock_converter_0/m_axis_aresetn] [get_bd_pins axis_data_fifo_1/s_axis_aresetn] [get_bd_pins util_vector_logic_1/Res]
-  connect_bd_net -net util_vector_logic_2_Res [get_bd_pins axis_clock_converter_0/s_axis_aresetn] [get_bd_pins util_vector_logic_2/Res]
-  connect_bd_net -net util_vector_logic_3_Res [get_bd_pins cmac_usplus_0/sys_reset] [get_bd_pins util_vector_logic_1/Op1] [get_bd_pins util_vector_logic_3/Res]
+  connect_bd_net -net m_axis_rx_reset_1 [get_bd_ports m_axis_rx_reset] [get_bd_pins cmac_usplus_0/sys_reset]
+  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins axis_clock_converter_tx_0/m_axis_aresetn] [get_bd_pins axis_data_fifo_1/s_axis_aresetn] [get_bd_pins util_vector_logic_0/Res]
   connect_bd_net -net xlconstant_0_dout [get_bd_pins axis_clock_converter_tx_0/s_axis_aresetn] [get_bd_pins xlconstant_0/dout]
 
 assign_bd_address

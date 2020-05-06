@@ -2164,9 +2164,9 @@ BEGIN
   BEGIN
     IF (rising_edge(ha_pclock)) THEN
       action_reset_n_q   <= NOT action_reset;
---#if defined(CONFIG_ENABLE_ETHERNET) && !defined(CONFIG_ENABLE_ETH_LOOP_BACK)
+#if defined(CONFIG_ENABLE_ETHERNET) && !defined(CONFIG_ENABLE_ETH_LOOP_BACK)
       eth_rst            <= pci_user_reset;
---#endif
+#endif
       pci_user_reset_q   <= pci_user_reset;
       pci_user_reset_qq  <= pci_user_reset_q;      
     END IF;
